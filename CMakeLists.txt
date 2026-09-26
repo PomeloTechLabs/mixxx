@@ -3826,6 +3826,17 @@ else()
     find_library(GLESv2_LIBRARY GLESv2)
     target_link_libraries(mixxx-lib PRIVATE "${GLESv2_LIBRARY}")
     target_compile_definitions(mixxx-lib PUBLIC QT_OPENGL_ES_2)
+  elseif(OHOS)
+    # OHOS provides GLESv3/EGL in the NDK sysroot; link explicitly since the
+    # re-rooted find_library search does not reach the sysroot library dir.
+    find_library(
+      GLESv3_LIBRARY
+      NAMES GLESv3
+      HINTS "$ENV{OHOS_SDK_ROOT}/native/sysroot/usr/lib/aarch64-linux-ohos"
+      NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+    )
+    target_link_libraries(mixxx-lib PRIVATE "${GLESv3_LIBRARY}")
+    target_compile_definitions(mixxx-lib PUBLIC QT_OPENGL_ES_2)
   else()
     find_package(WrapOpenGL REQUIRED)
     if(OPENGL_opengl_LIBRARY)
