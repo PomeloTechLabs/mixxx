@@ -138,3 +138,39 @@ docker run --rm \
 
 ### Next step
 - 等 Qt cross 产物 → vcpkg arm64-ohos 编 Tier1 依赖 → Mixxx OHOS configure 全量推进（TASK-003 前置）。
+
+## Task P1.3 — vcpkg arm64-ohos Tier-1 依赖
+
+Status: PASS
+
+### Goal
+用 vcpkg community triplet `arm64-ohos` 编出 Mixxx REQUIRED 依赖（静态库），验证官方 OHOS 工具链通路。
+
+### Build
+命令：`docker run winehua-dev … vcpkg install --triplet arm64-ohos --overlay-ports=/data/src/mixxx/cmake/ohos/ports <ports>`（volume `mixxx-ohos-vcpkg`，commit `6df3b6ad` 记录于 volume `VCPKG_COMMIT.txt`）
+结果：**PASS** — 30 个包全部安装（8.3 min），产物在 volume `/data/vcpkg/vcpkg/installed/arm64-ohos/{lib,share}`。
+
+直接安装：zlib libflac mp3lame libogg libvorbis libsndfile libebur128 soundtouch taglib rubberband portaudio fftw3 chromaprint opus opusfile
+连带（依赖/feature）：libsamplerate、mpg123、sleef、**FFmpeg 全家桶静态库**（libsndfile external-libs 拉入 avcodec/avformat/avutil/avfilter/avdevice — `FFMPEG` option 有望直接启用）、jack2（portaudio 依赖占位）。
+
+### Changed files
+- `cmake/ohos/ports/mp3lame/`（新增 overlay port）
+
+### 关键修复：mp3lame arm64-ohos
+第一现场：lame 3.100 自带 GNU `config.sub/config.guess` 过旧，不识别 `aarch64-unknown-linux-ohos` 三元组 → configure 失败。
+修复：overlay port 以"上游 4 个 patch 应用后的源码树"为基准生成 config-tools 更新 diff（`add-macos-universal-config.patch` 也改 config 工具，故补丁必须最后应用）；当前 GNU config（1992-2026）实测接受 ohos 三元组。
+教训：vcpkg 新版 `vcpkg-make` 会延迟重解压源码（`.tmp`→`.clean`），portfile 中 `file(COPY)` 方案无效，必须走 patch 链。
+
+### Qt 侧并行修复：node-addon-api
+Qt for OHOS configure 硬性要求 node-addon-api（QPA 链接 NAPI C++ 头）：`ERROR: Qt for OHOS requires node-api-addon. Set NODE_ADDON_API_ROOT`。
+修复：`build-qt-ohos.sh` 自动拉取 nodejs/node-addon-api `v8.9.2`（头文件库，无版本要求）到 volume `/data/out/extras/`，cross stage 传 `-DNODE_ADDON_API_ROOT`。
+
+### Evidence
+- `docs/ohos/logs/vcpkg-ohos-deps6.log`（成功轮；deps2-5 为失败迭代）
+- `docs/ohos/logs/qt-ohos-cross.log`（node-addon-api 拉取 + `-- OHOS build detected`）
+
+### Remaining blocker
+- Qt cross qtbase 编译进行中（cross 阶段从 node-addon-api 修复后续跑）。
+
+### Next step
+- Qt cross 完成 → TASK-003 前置：Mixxx OHOS 全量 configure（Qt cross + vcpkg 组合）。
