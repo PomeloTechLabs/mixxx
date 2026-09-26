@@ -79,11 +79,13 @@ Status: IN PROGRESS（后台 Docker 编译）
 - 容器：`winehua-dev` 镜像 + `F:\command-line-tools` → `/apps/harmony`（`OHOS_SDK=/apps/harmony/sdk/default/openharmony`）
 
 ### Build
-命令：见 `cmake/ohos/BUILD_QT_OHOS.md`（Docker 容器内运行）
-结果：（待编译日志填充）
+命令：`docs/ohos/BUILD_QT_OHOS.md` §3（winehua-dev 容器，STAGE=all，24 jobs，volume `mixxx-ohos-qt-build`/`mixxx-ohos-qt-out`）
+结果：RUNNING（2026-09-26 启动；host qtbase configure 已通过，交叉工具链构建中）
 
 ### Evidence
-日志：`docs/ohos/logs/qt-host.log` / `qt-cross.log`
+日志：`docs/ohos/logs/qt-ohos-build.log`（不随 git 提交）
+pin 校验：5 个模块 HEAD 与 `cmake/ohos/qt-ohos-pins.txt` 一致 ✅
+host GL 头：容器内可用（未触发 tools-only 降级）✅
 
 ### Remaining blocker
 - qtbase dev OHOS 支持为 2026 新合入代码，未随任何 release tag 发布；若 configure 失败需回读 qtbase dev 的 OHOS CI/文档修正参数。
