@@ -2639,7 +2639,9 @@ if(WIN32)
   include(InstallRequiredSystemLibraries)
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT OHOS)
+  # On OHOS the mixxx target is a MODULE (libmixxx.so inside the HAP);
+  # installation is handled by packaging/ohos (docs/ohos/).
   install(
     TARGETS mixxx
     RUNTIME DESTINATION "${MIXXX_INSTALL_BINDIR}"
