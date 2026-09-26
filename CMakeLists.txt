@@ -3355,7 +3355,7 @@ target_link_libraries(mixxx-lib PRIVATE Chromaprint::Chromaprint)
 
 # Locale Aware Compare for SQLite
 find_package(SQLite3)
-if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
+if(NOT TARGET SQLite3::SQLite3 AND TARGET SQLite::SQLite3) # CMake < 4.3
   # This will allow to use the new name while still permitting it to
   # compile with older versions of CMake.
   add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
