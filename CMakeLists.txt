@@ -265,7 +265,12 @@ function(fatal_error_missing_env)
   endif()
 endfunction()
 
-if(UNIX AND NOT APPLE AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "ohos\\.toolchain\\.cmake$")
+if(
+  UNIX
+  AND NOT APPLE
+  AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "ohos\\.toolchain\\.cmake$"
+  AND NOT VCPKG_TARGET_TRIPLET MATCHES "ohos$"
+)
   # Cross-compiling for OHOS may happen inside a container whose host kernel
   # reports WSL (Docker Desktop); the WSL guard only concerns native builds.
   # The toolchain-file match is used because CMAKE_SYSTEM_NAME from the OHOS
