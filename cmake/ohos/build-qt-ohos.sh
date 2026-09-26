@@ -203,7 +203,7 @@ build_cross() {
   cmake --build "${QT_BUILD_ROOT}/cross/qtbase" -j "${JOBS}"
   cmake --install "${QT_BUILD_ROOT}/cross/qtbase"
 
-  for module in qtshadertools qtsvg qtimageformats qtdeclarative qt5compat; do
+  for module in qtshadertools qtsvg qtimageformats qtdeclarative qt5compat qtmultimedia; do
     log "cross: ${module}"
     cmake -S "${QT_SRC_ROOT}/${module}" -B "${QT_BUILD_ROOT}/cross/${module}" \
       -G Ninja \
