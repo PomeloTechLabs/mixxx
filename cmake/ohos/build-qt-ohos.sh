@@ -154,6 +154,7 @@ cross_common_cmake_args() {
     -DQT_HOST_PATH="${QT_HOST_PREFIX}" \
     -DNODE_ADDON_API_ROOT="${NODE_ADDON_API_DIR}" \
     -DCMAKE_FIND_ROOT_PATH="${NODE_ADDON_API_DIR};${QT_VCPKG_INSTALLED}" \
+    -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="/data/src/mixxx/cmake/ohos/qt-ohos-inject.cmake" \
     -DQT_BUILD_EXAMPLES=OFF \
     -DQT_BUILD_TESTS=OFF \
     -DFEATURE_vulkan=OFF \
@@ -173,6 +174,10 @@ cross_common_cmake_args() {
 
 build_cross() {
   ensure_node_addon_api
+  # fontconfig is linked as a static archive into Qt's shared libs; its
+  # expat dependency must come along. Passed via LDFLAGS so CMake picks it
+  # up when initializing the linker flag caches (no spaces via -D).
+  export LDFLAGS="-L${QT_VCPKG_INSTALLED}/lib -lexpat"
   log "cross stage for ${OHOS_ARCH} (jobs=${JOBS})"
 
   log "cross: qtbase"
