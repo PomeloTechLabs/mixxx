@@ -225,6 +225,13 @@ function(fatal_error_missing_env)
         "Did you download the Mixxx build environment using `source ${CMAKE_SOURCE_DIR}/tools/macos_release_buildenv.sh setup` or `source ${CMAKE_SOURCE_DIR}/tools/macos_buildenv.sh setup` (includes Debug)?"
       )
     endif()
+  elseif(OHOS)
+    # HarmonyOS NEXT / OpenHarmony (docs/ohos/): Qt cross install + a vcpkg
+    # arm64-ohos environment are passed via CMAKE_FIND_ROOT_PATH.
+    message(
+      FATAL_ERROR
+      "OHOS build environment incomplete. Pass -DCMAKE_FIND_ROOT_PATH=\"<Qt-OHOS-install>;<vcpkg>/installed/arm64-ohos\" (both with a usr -> . symlink), -DQT_HOST_PATH=<host Qt>, -DMIXXX_VCPKG_ROOT=<vcpkg root>. See docs/ohos/DEPENDENCY_MATRIX.md."
+    )
   elseif(UNIX AND NOT APPLE AND NOT ANDROID)
     # Linux, BSD, Solaris, Minix
     if(DEFINED MIXXX_VCPKG_ROOT)
