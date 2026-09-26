@@ -10,16 +10,18 @@
 set(_MIXXX_VCPKG_PREFIX "/data/vcpkg/vcpkg/installed/arm64-ohos")
 
 if(NOT TARGET ZLIB::ZLIB)
-  add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
+  add_library(ZLIB::ZLIB UNKNOWN IMPORTED GLOBAL)
   set_target_properties(ZLIB::ZLIB PROPERTIES
+    IMPORTED_GLOBAL TRUE
     IMPORTED_LOCATION "${_MIXXX_VCPKG_PREFIX}/lib/libz.a"
     INTERFACE_INCLUDE_DIRECTORIES "${_MIXXX_VCPKG_PREFIX}/include"
   )
 endif()
 
 if(NOT TARGET BZip2::BZip2)
-  add_library(BZip2::BZip2 UNKNOWN IMPORTED)
+  add_library(BZip2::BZip2 UNKNOWN IMPORTED GLOBAL)
   set_target_properties(BZip2::BZip2 PROPERTIES
+    IMPORTED_GLOBAL TRUE
     IMPORTED_LOCATION "${_MIXXX_VCPKG_PREFIX}/lib/libbz2.a"
     INTERFACE_INCLUDE_DIRECTORIES "${_MIXXX_VCPKG_PREFIX}/include"
   )
