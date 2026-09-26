@@ -191,6 +191,7 @@ build_cross() {
   for module in qtshadertools qtsvg qtimageformats qtdeclarative; do
     log "cross: ${module}"
     cmake -S "${QT_SRC_ROOT}/${module}" -B "${QT_BUILD_ROOT}/cross/${module}" \
+      -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE="${OHOS_TOOLCHAIN}" \
       -DOHOS_ARCH="${OHOS_ARCH}" \
