@@ -18,6 +18,10 @@ QT_OUT_ROOT="${QT_OUT_ROOT:-/data/out}"
 QT_HOST_PREFIX="${QT_OUT_ROOT}/qt-host"
 QT_CROSS_PREFIX="${QT_OUT_ROOT}/qt-ohos"
 QT_CROSS_DEVICE_PREFIX="${QT_OUT_ROOT}/qt-ohos-device"
+# node-addon-api (header-only) is required by Qt's ohos QPA (NODE_ADDON_API_ROOT)
+NODE_ADDON_API_TAG="${NODE_ADDON_API_TAG:-v8.9.2}"
+NODE_ADDON_API_DIR="${QT_OUT_ROOT}/extras/node-addon-api-${NODE_ADDON_API_TAG}"
+PROXY="${PROXY:-http://host.docker.internal:8080}"
 STAGE="${STAGE:-all}"
 JOBS="${JOBS:-$(nproc)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -120,6 +124,17 @@ build_host() {
   log "host stage done: ${QT_HOST_PREFIX}"
 }
 
+ensure_node_addon_api() {
+  if [ -f "${NODE_ADDON_API_DIR}/napi.h" ]; then
+    return 0
+  fi
+  log "fetching node-addon-api ${NODE_ADDON_API_TAG}"
+  mkdir -p "${NODE_ADDON_API_DIR}"
+  curl -fsSL -x "${PROXY}" \
+    "https://github.com/nodejs/node-addon-api/archive/refs/tags/${NODE_ADDON_API_TAG}.tar.gz" \
+    | tar xz -C "${NODE_ADDON_API_DIR}" --strip-components=1
+}
+
 cross_common_cmake_args() {
   printf '%s\n' \
     -G Ninja \
@@ -127,6 +142,7 @@ cross_common_cmake_args() {
     -DCMAKE_TOOLCHAIN_FILE="${OHOS_TOOLCHAIN}" \
     -DOHOS_ARCH="${OHOS_ARCH}" \
     -DQT_HOST_PATH="${QT_HOST_PREFIX}" \
+    -DNODE_ADDON_API_ROOT="${NODE_ADDON_API_DIR}" \
     -DQT_BUILD_EXAMPLES=OFF \
     -DQT_BUILD_TESTS=OFF \
     -DFEATURE_vulkan=OFF \
@@ -145,6 +161,7 @@ cross_common_cmake_args() {
 }
 
 build_cross() {
+  ensure_node_addon_api
   log "cross stage for ${OHOS_ARCH} (jobs=${JOBS})"
 
   log "cross: qtbase"
