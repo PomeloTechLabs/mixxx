@@ -21,6 +21,12 @@ QT_CROSS_DEVICE_PREFIX="${QT_OUT_ROOT}/qt-ohos-device"
 # node-addon-api (header-only) is required by Qt's ohos QPA (NODE_ADDON_API_ROOT)
 NODE_ADDON_API_TAG="${NODE_ADDON_API_TAG:-v8.9.2}"
 NODE_ADDON_API_DIR="${QT_OUT_ROOT}/extras/node-addon-api-${NODE_ADDON_API_TAG}"
+# vcpkg arm64-ohos installed tree (mount the mixxx-ohos-vcpkg volume here).
+# Qt's ohos QPA unconditionally needs fontconfig, which the public NDK
+# sysroot lacks; vcpkg provides it.
+QT_VCPKG_ROOT="${QT_VCPKG_ROOT:-/data/vcpkg/vcpkg}"
+QT_VCPKG_TRIPLET="${QT_VCPKG_TRIPLET:-arm64-ohos}"
+QT_VCPKG_INSTALLED="${QT_VCPKG_ROOT}/installed/${QT_VCPKG_TRIPLET}"
 PROXY="${PROXY:-http://host.docker.internal:8080}"
 STAGE="${STAGE:-all}"
 JOBS="${JOBS:-$(nproc)}"
@@ -136,6 +142,10 @@ ensure_node_addon_api() {
 }
 
 cross_common_cmake_args() {
+  # NOTE: the OHOS toolchain forces FIND_ROOT_PATH_MODE_INCLUDE=ONLY, which
+  # re-roots every find_path/library HINTS into the sysroot. Extra roots
+  # (node-addon-api now, cross Qt prefix for later modules) must be listed
+  # explicitly via CMAKE_FIND_ROOT_PATH or nothing outside the NDK is found.
   printf '%s\n' \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -143,6 +153,7 @@ cross_common_cmake_args() {
     -DOHOS_ARCH="${OHOS_ARCH}" \
     -DQT_HOST_PATH="${QT_HOST_PREFIX}" \
     -DNODE_ADDON_API_ROOT="${NODE_ADDON_API_DIR}" \
+    -DCMAKE_FIND_ROOT_PATH="${NODE_ADDON_API_DIR};${QT_VCPKG_INSTALLED}" \
     -DQT_BUILD_EXAMPLES=OFF \
     -DQT_BUILD_TESTS=OFF \
     -DFEATURE_vulkan=OFF \
@@ -180,6 +191,7 @@ build_cross() {
       -DOHOS_ARCH="${OHOS_ARCH}" \
       -DCMAKE_PREFIX_PATH="${QT_CROSS_PREFIX}" \
       -DQT_HOST_PATH="${QT_HOST_PREFIX}" \
+      -DCMAKE_FIND_ROOT_PATH="${QT_CROSS_PREFIX};${NODE_ADDON_API_DIR};${QT_VCPKG_INSTALLED}" \
       -DCMAKE_STAGING_PREFIX="${QT_CROSS_PREFIX}" \
       -DCMAKE_INSTALL_PREFIX="${QT_CROSS_DEVICE_PREFIX}" \
       -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF
