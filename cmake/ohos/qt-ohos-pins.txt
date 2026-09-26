@@ -1,0 +1,9 @@
+# Pinned Qt dev-branch SHAs for the Mixxx OHOS port.
+# Recorded 2026-09-26 (dev branch HEADs on that day; OHOS support is only on
+# dev — no release tag contains it yet, see docs/ohos/BUILD_QT_OHOS.md).
+# Format: <module> <sha>
+qtbase 2be39d2fa91aa06df766873aa63458be5923290e
+qtdeclarative 1171fd3c023c6b777ed567d32a159c14ba22b5e5
+qtshadertools 0dbd8c22599c1ca76ec1fac323e6d6cc4ebd20c3
+qtsvg effc94fe42b41462a7ae961ad3ebd26c6bdcd0a1
+qtimageformats 13878ad93b96aa186cdb0cdfb9125642718dc79e

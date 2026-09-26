@@ -265,7 +265,11 @@ function(fatal_error_missing_env)
   endif()
 endfunction()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "ohos\\.toolchain\\.cmake$")
+  # Cross-compiling for OHOS may happen inside a container whose host kernel
+  # reports WSL (Docker Desktop); the WSL guard only concerns native builds.
+  # The toolchain-file match is used because CMAKE_SYSTEM_NAME from the OHOS
+  # toolchain is only visible after project().
   execute_process(
     COMMAND uname -r
     OUTPUT_VARIABLE UNAME_R
@@ -547,6 +551,18 @@ elseif(APPLE)
 endif()
 
 project(mixxx VERSION 2.7.0 LANGUAGES C CXX)
+
+# HarmonyOS NEXT / OpenHarmony bring-up (docs/ohos/).
+# CMAKE_SYSTEM_NAME=OHOS is set by the SDK toolchain
+# (<sdk>/native/build/cmake/ohos.toolchain.cmake) or the vcpkg arm64-ohos
+# triplet; it only becomes visible here, after project(). Never fake ANDROID.
+if(CMAKE_SYSTEM_NAME STREQUAL OHOS)
+  set(OHOS ON)
+  if(NOT DEFINED OHOS_ARCH)
+    set(OHOS_ARCH arm64-v8a)
+  endif()
+  message(STATUS "[OHOS] target detected: arch=${OHOS_ARCH}")
+endif()
 # Work around missing version suffixes support https://gitlab.kitware.com/cmake/cmake/-/issues/16716
 set(MIXXX_VERSION_PRERELEASE "alpha") # set to "alpha" "beta" or ""
 
@@ -2329,6 +2345,12 @@ elseif(UNIX)
   set(MIXXX_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}")
   set(MIXXX_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}")
   set(MIXXX_INSTALL_LICENSEDIR "${CMAKE_INSTALL_DOCDIR}")
+elseif(OHOS)
+  # Same layout convention as UNIX; final packaging lives in packaging/ohos.
+  set(MIXXX_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}")
+  set(MIXXX_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}")
+  set(MIXXX_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}")
+  set(MIXXX_INSTALL_LICENSEDIR "${CMAKE_INSTALL_DOCDIR}")
 endif()
 
 if(WIN32)
@@ -2366,6 +2388,9 @@ elseif(UNIX)
       target_compile_definitions(mixxx-lib PUBLIC __BSD__)
     endif()
   endif()
+elseif(OHOS)
+  # OHOS is POSIX-like (musl), but not Linux: no __LINUX__, no Android macros.
+  target_compile_definitions(mixxx-lib PUBLIC __UNIX__ MIXXX_OS_OHOS)
 endif()
 
 # The mixxx executable
@@ -2388,6 +2413,17 @@ if(QT6)
     add_compile_definitions(MIXXX_USE_QML)
   else()
     message(STATUS "Building without QML")
+  endif()
+
+  if(OHOS)
+    # Bring-up visibility (docs/ohos/TASK-002): one line summarizing the
+    # OHOS feature preset as actually configured.
+    message(
+      STATUS
+        "[OHOS] Qt6 ${Qt6_VERSION}, QML=${QML}, HID=${HID}, BULK=${BULK}, "
+        "BROADCAST=${BROADCAST}, VINYLCONTROL=${VINYLCONTROL}, "
+        "FFMPEG=${FFMPEG}, BUILD_TESTING=${BUILD_TESTING}"
+    )
   endif()
 
   # qt_add_executable() is the recommended initial call for qt_finalize_target()
