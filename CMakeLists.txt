@@ -336,11 +336,13 @@ if(DEFINED MIXXX_VCPKG_ROOT)
   endif()
 
   if(
-    EXISTS "${MIXXX_VCPKG_ROOT}/overlay/ports"
+    VCPKG_TARGET_TRIPLET MATCHES "ohos$"
+    OR EXISTS "${MIXXX_VCPKG_ROOT}/overlay/ports"
     OR NOT EXISTS "${MIXXX_VCPKG_ROOT}/ports"
   )
     # MIXXX_VCPKG_ROOT points to our vcpkg environment
     # and we configure the CMAKE_TOOLCHAIN_FILE and overlays accordingly
+    # (OHOS bring-up uses a stock vcpkg checkout instead: docs/ohos/)
     message(STATUS "Using MIXXX_VCPKG_ROOT: ${MIXXX_VCPKG_ROOT}")
   else()
     message(
