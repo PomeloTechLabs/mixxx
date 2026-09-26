@@ -36,6 +36,21 @@ OHOS_TOOLCHAIN="${OHOS_SDK}/native/build/cmake/ohos.toolchain.cmake"
 
 log() { printf '\n===== [qt-ohos] %s =====\n' "$*"; }
 
+# Containers are ephemeral: install the host build deps on every run.
+ensure_host_deps() {
+  local need=0
+  command -v gperf >/dev/null 2>&1 || need=1
+  ldconfig -p 2>/dev/null | grep -q libEGL.so.1 || need=1
+  [ "${need}" -eq 0 ] && return 0
+  log "installing host deps (gperf, GL/EGL runtime)"
+  apt-get update -qq >/dev/null 2>&1 || true
+  apt-get install -y --no-install-recommends gperf libegl1 libgl1 \
+    >/dev/null 2>&1 || {
+      echo "ERROR: apt-get failed (proxy ${PROXY}?)" >&2
+      exit 1
+    }
+}
+
 verify_pins() {
   log "verifying pinned module SHAs"
   local mismatch=0
@@ -209,6 +224,7 @@ build_cross() {
 }
 
 verify_pins
+ensure_host_deps
 
 case "${STAGE}" in
   host)  build_host ;;
