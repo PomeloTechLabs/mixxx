@@ -44,7 +44,7 @@ ensure_host_deps() {
   [ "${need}" -eq 0 ] && return 0
   log "installing host deps (gperf, GL/EGL runtime)"
   apt-get update -qq >/dev/null 2>&1 || true
-  apt-get install -y --no-install-recommends gperf libegl1 libgl1 \
+  apt-get install -y --no-install-recommends gperf libegl1 libgl1 libopengl0 \
     >/dev/null 2>&1 || {
       echo "ERROR: apt-get failed (proxy ${PROXY}?)" >&2
       exit 1
