@@ -4702,7 +4702,7 @@ if(APPLE)
     # Used for battery measurements and controlling the screensaver on macOS.
     target_link_libraries(mixxx-lib PRIVATE "-weak_framework IOKit")
   endif()
-elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN AND NOT ANDROID)
+elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN AND NOT ANDROID AND NOT OHOS)
   if(QT6)
     find_package(X11)
   else()
