@@ -4985,7 +4985,7 @@ cmake_dependent_option(
   BATTERY
   "Battery meter support"
   ON
-  "WIN32 OR (UNIX AND NOT ANDROID)"
+  "WIN32 OR (UNIX AND NOT ANDROID AND NOT OHOS)"
   OFF
 )
 if(BATTERY)
