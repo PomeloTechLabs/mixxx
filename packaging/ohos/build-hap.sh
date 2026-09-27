@@ -15,7 +15,7 @@ QT_OHOS=/data/out/qt-ohos
 QT_HOST=/data/out/qt-host
 VCPKG_LIB=/data/vcpkg/vcpkg/installed/arm64-ohos/usr/lib
 CLT=/apps/harmony
-ARCH=arm64
+ARCH=arm64-v8a   # HarmonyOS ABI dir name (must match the device abilist)
 
 log() { printf '\n===== [hap] %s =====\n' "$*"; }
 
@@ -37,9 +37,12 @@ mkdir -p "${LIBS}"
 
 # Qt libraries (everything shipped in the cross install tree)
 find "${QT_OHOS}/lib" -maxdepth 1 -name "*.so*" -exec cp -P {} "${LIBS}/" \;
-# Qt plugins (platforms/, imageformats/, multimedia/, sqldrivers/, ...) must
-# live directly under the directory QT_PLUGIN_PATH points to.
+# Qt plugins (platforms/, imageformats/, multimedia/, sqldrivers/, ...).
 cp -r "${QT_OHOS}/plugins/." "${LIBS}/"
+# The QPA plugin is also the ArkTS NAPI entry point ("import ... from
+# 'libqohos.so'") and Qt sets QT_QPA_PLATFORM_PLUGIN_PATH to the libs root,
+# so it must exist at the root, not only under platforms/.
+cp -f "${QT_OHOS}/plugins/platforms/libqohos.so" "${LIBS}/"
 # QML module tree: .so files live under libs (dlopen-able), qmldir next to them
 cp -r "${QT_OHOS}/qml" "${LIBS}/qml"
 # Boot shell

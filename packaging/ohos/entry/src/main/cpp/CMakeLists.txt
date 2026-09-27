@@ -19,6 +19,11 @@ list(APPEND CMAKE_FIND_ROOT_PATH "${QT_OHOS_PREFIX}")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick)
 
+# Use the /qt/qml resource prefix for QML modules (default since Qt 6.5;
+# the policy is OFF by default when the project sets an older CMake policy
+# minimum, which would put the module at /<uri> instead).
+qt_policy(SET QTP0001 NEW)
+
 qt_add_executable(qtmixxxboot SHARED qtmixxxboot.cpp)
 
 set_target_properties(qtmixxxboot PROPERTIES OUTPUT_NAME "qtmixxxboot")

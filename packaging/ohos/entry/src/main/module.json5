@@ -3,9 +3,13 @@
     "name": "entry",
     "type": "entry",
     "srcEntry": "./ets/qabilitystage/QAbilityStage.ets",
-    "description": "%%INSERT_MODULE_DESCRIPTION%%",
+    "description": "$string:module_desc",
     "mainElement": "QAbility",
-    "deviceTypes": [/* %%INSERT_DEVICE_TYPES%% */],
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
     "deliveryWithInstall": true,
     "installationFree": false,
     "pages": "$profile:main_pages",
@@ -14,7 +18,7 @@
         "name": "QAbility",
         "srcEntry": "./ets/qability/QAbility.ets",
         "launchType": "specified",
-        /* %%INSERT_ABILITY_ORIENTATION%% */
+        "orientation": "auto_rotation",
         "description": "$string:QAbility_desc",
         "icon": "$media:layered_image",
         "label": "$string:QAbility_label",

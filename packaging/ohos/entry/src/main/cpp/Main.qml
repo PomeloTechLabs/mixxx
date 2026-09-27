@@ -4,7 +4,8 @@ Window {
     id: root
     width: 960
     height: 600
-    visible: true
+    // Shown by qtmixxxboot.cpp once the ArkUI window stage is ready.
+    visible: false
     color: "#101418"
 
     Rectangle {
