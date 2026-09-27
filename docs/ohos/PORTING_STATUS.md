@@ -279,5 +279,44 @@ profile 本身合法（verify-profile PASS；bundle-name=com.pomelo.mixxx；type
 - B：AGC 用 `sign/ad.csr` 新建调试证书 → 新 profile → 下载 cer+p7b 替换 `sign/`；
 随后 `scripts/verify-materials.sh` 校验三件套 → `scripts/sign-hap.sh` 签名 → hdc install。
 
+## Task P1.6 — 真机启动链打通（签名 + native 加载 + Qt 生命周期）
+
+Status: IN PROGRESS（已越过全部已知崩溃点，待解锁屏幕后做最终可见性验证）
+
+### 签名（已解决）
+DevEco Studio 自动签名为 `com.pomelo.mixxx` 生成了自洽三件套（`~/.ohos/config/default_ohos_8KS52…`，alias `debugKey`，
+profile type=debug、bundle-name 匹配、device-ids 含本机 UDID）。
+
+之前失败原因：`sign/app_debug.p12`(alias ad, pubkey 14d310f4) / `app_debug.cer`(df21a3c0) / `mixxx_调试Debug.p7b`(dev-cert 5f900b73) 三者互不匹配；
+HarmonyOS NEXT 要求 **私钥 = 应用证书 = profile 内嵌证书** 三者公钥一致。
+
+构建/签名命令（Windows 侧 DevEco CLI，密码由 hvigor 解密）：
+
+```
+DEVECO_SDK_HOME="C:/Program Files/Huawei/DevEco Studio/sdk" \
+JAVA_HOME="C:/Program Files/Huawei/DevEco Studio/jbr" \
+node "C:/Program Files/Huawei/DevEco Studio/tools/hvigor/bin/hvigorw.js" \
+  --mode module -p module=entry@default -p product=default assembleHap --no-daemon
+```
+
+产出 `entry/build/default/outputs/default/entry-default-signed.hap`（SignHap 成功）。
+SDK 版本需匹配 DevEco 自带 SDK：`6.1.0(23)`（HarmonyOS 6.0.33 / API 23）。
+
+### 真机运行链修复（按出现顺序）
+
+| 现象 | 根因 | 修复 |
+|---|---|---|
+| 图标/名称为模板值；点击黑屏 | 启动器缓存 + 文本资源未改 | `app_name`/`QAbility_label` → `Mixxx`；图标用提供的 1024×1024 素材（AppScope app_icon、entry layered background/foreground、startIcon）；卸载重装清缓存 |
+| `Load native module failed: @app:…/entry/qohos` | HAP 内库目录名 `libs/arm64/` 不是 ABI 名 | 改为 **`libs/arm64-v8a/`**（运行时映射到 `…/libs/arm64`） |
+| 同上 | `libqohos.so` 只在 `platforms/` 子目录 | **复制到 libs 根**：它既是 ArkTS NAPI 入口（`import qpa from 'libqohos.so'`），也是 Qt QPA 插件（`QT_QPA_PLATFORM_PLUGIN_PATH` = libs 根） |
+| `Error loading shared library libc++_shared.so` | 未捆绑 C++ 运行时 | 从 NDK 复制 `libc++_shared.so` 进 libs |
+| `TypeError: Cannot read property handleAbilityStageOnCreate of undefined` → JS_ERROR 杀进程 | 上述 native 加载失败的直接后果 | 同上（修复后消失） |
+| `SIGABRT … makeWindowProxyDataForExistingMainWindowInJsThread`: ability without windowStage | boot 库 5ms 内建窗，竞速 `QAbility.onWindowStageCreate`(55ms) | `Main.qml` `visible:false`，`QTimer::singleShot(1500)` 后再显示 |
+
+### 设备
+
+HUAWEI MLR-AL10（arm64-v8a，UDID B4BB7C38…）。hdc 连接偶发失效（需 `hdc kill && hdc start`）；启动应用需屏幕解锁。
+
 ### Next step
-- 材料就绪 → 签名安装 → hilog 验证启动链（`[hap]` boot 日志）→ 切 `APP_LIBRARY_NAME=libmixxx.so` 进 TASK-004。
+- 解锁屏幕后启动，确认 QML 启动画面可见；
+- 随后切换 `QtAppConstants.APP_LIBRARY_NAME` → `libmixxx.so`，进入 TASK-004（CoreServices 启动闭环）。
