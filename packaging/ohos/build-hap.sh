@@ -43,6 +43,10 @@ cp -r "${QT_OHOS}/plugins/." "${LIBS}/"
 # 'libqohos.so'") and Qt sets QT_QPA_PLATFORM_PLUGIN_PATH to the libs root,
 # so it must exist at the root, not only under platforms/.
 cp -f "${QT_OHOS}/plugins/platforms/libqohos.so" "${LIBS}/"
+# Do NOT keep a second copy under platforms/: two mappings of the same
+# plugin mean two independent static states (peer registries) and Qt's
+# window-proxy lookup then fails in makeWindowProxyDataForExistingMainWindow.
+rm -f "${LIBS}/platforms/libqohos.so"
 # QML module tree: .so files live under libs (dlopen-able), qmldir next to them
 cp -r "${QT_OHOS}/qml" "${LIBS}/qml"
 # Boot shell

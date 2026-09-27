@@ -1,3 +1,5 @@
+import hilog from '@ohos.hilog';
+
 interface WindowNativeNodeCreateInfo {
   xComponentId: string
   onAppear: () => void
@@ -25,9 +27,18 @@ struct WindowNativeNode {
           id: this.createInfo.xComponentId,
           libraryname: 'qohos'
         })
-        .onAttach(this.createInfo.onAttach)
-        .onAppear(this.createInfo.onAppear)
-        .onDisAppear(this.createInfo.onDisAppear)
+        .onAttach(() => {
+          hilog.info(0x0000, 'mixxxohos', 'XComponent onAttach event');
+          this.createInfo?.onAttach();
+        })
+        .onAppear(() => {
+          hilog.info(0x0000, 'mixxxohos', 'XComponent onAppear event');
+          this.createInfo?.onAppear();
+        })
+        .onDisAppear(() => {
+          hilog.info(0x0000, 'mixxxohos', 'XComponent onDisAppear event');
+          this.createInfo?.onDisAppear();
+        })
         .width('100%')
         .height('100%')
       }
