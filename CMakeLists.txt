@@ -2354,13 +2354,15 @@ elseif(APPLE AND IOS)
     CACHE STRING
     "The iOS app bundle identifier"
   )
-elseif(UNIX)
+elseif(OHOS)
+  # The OHOS toolchain sets UNIX, so this branch must come before the UNIX
+  # one. Same layout convention as UNIX; final packaging lives in
+  # packaging/ohos.
   set(MIXXX_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}")
   set(MIXXX_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}")
   set(MIXXX_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}")
   set(MIXXX_INSTALL_LICENSEDIR "${CMAKE_INSTALL_DOCDIR}")
-elseif(OHOS)
-  # Same layout convention as UNIX; final packaging lives in packaging/ohos.
+elseif(UNIX)
   set(MIXXX_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}")
   set(MIXXX_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}")
   set(MIXXX_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}")
@@ -2389,6 +2391,10 @@ if(WIN32)
     # Force MSVS to generate a manifest (MSVC2010)
     target_link_options(mixxx-lib PUBLIC /manifest)
   endif()
+elseif(OHOS)
+  # Must precede the UNIX branch (the OHOS toolchain sets UNIX). OHOS is
+  # POSIX-like (musl), but not Linux: no __LINUX__, no Android macros.
+  target_compile_definitions(mixxx-lib PUBLIC __UNIX__ MIXXX_OS_OHOS)
 elseif(UNIX)
   if(APPLE)
     target_compile_definitions(mixxx-lib PUBLIC __APPLE__)
@@ -2402,9 +2408,6 @@ elseif(UNIX)
       target_compile_definitions(mixxx-lib PUBLIC __BSD__)
     endif()
   endif()
-elseif(OHOS)
-  # OHOS is POSIX-like (musl), but not Linux: no __LINUX__, no Android macros.
-  target_compile_definitions(mixxx-lib PUBLIC __UNIX__ MIXXX_OS_OHOS)
 endif()
 
 # The mixxx executable
