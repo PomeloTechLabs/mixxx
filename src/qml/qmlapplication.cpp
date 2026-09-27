@@ -483,6 +483,11 @@ bool QmlApplication::loadQml(const QString& path) {
     m_autoReload.clear();
     m_pAppEngine->addUrlInterceptor(&m_autoReload);
     m_pAppEngine->addImportPath(QStringLiteral(":/mixxx.org/imports"));
+#if defined(MIXXX_OS_OHOS)
+    // In the HAP Qt's QML modules are bundled next to the application library.
+    m_pAppEngine->addImportPath(
+            QCoreApplication::applicationDirPath() + QStringLiteral("/qml"));
+#endif
 
     registerImageProvider();
 

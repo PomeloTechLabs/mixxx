@@ -65,7 +65,20 @@ QString computeResourcePathImpl() {
                         "'--resource-path <path>'.");
             }
         }
-#if defined(__UNIX__) && !defined(__ANDROID__)
+#if defined(MIXXX_OS_OHOS)
+        // In the HAP the resources are bundled next to the application
+        // library (libs/<abi>/res); MIXXX_RESOURCESDIR overrides that.
+        else {
+            const QString envPath = qEnvironmentVariable("MIXXX_RESOURCESDIR");
+            if (!envPath.isEmpty() && QDir(envPath).exists()) {
+                qResourcePath = envPath;
+            } else if (mixxxDir.cd(QStringLiteral("res"))) {
+                qResourcePath = mixxxDir.absolutePath();
+            } else {
+                qResourcePath = QCoreApplication::applicationDirPath();
+            }
+        }
+#elif defined(__UNIX__) && !defined(__ANDROID__)
         else if (mixxxDir.cd(QStringLiteral("../share/mixxx"))) {
             qResourcePath = mixxxDir.absolutePath();
         }
