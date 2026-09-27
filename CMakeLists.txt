@@ -4938,11 +4938,17 @@ if(RUBBERBAND)
   # carry that transitive dependency. On OHOS the sleef config also expects
   # an OpenMP target that does not exist, so link the archives directly.
   if(OHOS AND DEFINED MIXXX_VCPKG_ROOT)
+    # sleef[dft] is built with OpenMP and libsndfile's mpeg feature pulls in
+    # mpg123; their imported targets do not survive the OHOS find round-trip,
+    # so close the transitive closures explicitly. libomp comes from the NDK
+    # via -static-openmp.
+    target_link_options(mixxx-lib PRIVATE -fopenmp -static-openmp)
     target_link_libraries(
       mixxx-lib
       PRIVATE
         "${MIXXX_VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib/libsleef.a"
         "${MIXXX_VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib/libsleefdft.a"
+        "${MIXXX_VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib/libmpg123.a"
     )
   else()
     find_package(sleef CONFIG QUIET)
