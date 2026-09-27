@@ -4935,13 +4935,23 @@ if(RUBBERBAND)
   target_link_libraries(mixxx-lib PUBLIC rubberband::rubberband)
   target_compile_definitions(mixxx-lib PUBLIC __RUBBERBAND__)
   # vcpkg's rubberband links sleef statically; the imported target does not
-  # carry that transitive dependency, so pull it in explicitly when present.
-  find_package(sleef CONFIG QUIET)
-  if(TARGET sleef::sleef)
-    target_link_libraries(mixxx-lib PRIVATE sleef::sleef)
-  endif()
-  if(TARGET sleef::sleefdft)
-    target_link_libraries(mixxx-lib PRIVATE sleef::sleefdft)
+  # carry that transitive dependency. On OHOS the sleef config also expects
+  # an OpenMP target that does not exist, so link the archives directly.
+  if(OHOS AND DEFINED MIXXX_VCPKG_ROOT)
+    target_link_libraries(
+      mixxx-lib
+      PRIVATE
+        "${MIXXX_VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib/libsleef.a"
+        "${MIXXX_VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib/libsleefdft.a"
+    )
+  else()
+    find_package(sleef CONFIG QUIET)
+    if(TARGET sleef::sleef)
+      target_link_libraries(mixxx-lib PRIVATE sleef::sleef)
+    endif()
+    if(TARGET sleef::sleefdft)
+      target_link_libraries(mixxx-lib PRIVATE sleef::sleefdft)
+    endif()
   endif()
   if(QML)
     target_link_libraries(mixxx-qml-lib PRIVATE rubberband::rubberband)
