@@ -1,0 +1,15 @@
+--- a/src/os/unix/pa_unix_util.c
++++ b/src/os/unix/pa_unix_util.c
+@@ -197,6 +197,12 @@
+        working thread (callbackThread) has'n received any stop signals from outside, please keep
+        this in mind when considering using PaUtil_CancelThreading
+     */
++/* OHOS musl defines PTHREAD_CANCELED but provides no pthread_cancel
++ * implementation; use the flag+join path instead (same as Android). */
++#if defined(__OHOS__)
++#undef PTHREAD_CANCELED
++#endif
++
+ #ifdef PTHREAD_CANCELED
+     /* Only kill the thread if it isn't in the process of stopping (flushing adaptation buffers) */
+     if( !wait )
