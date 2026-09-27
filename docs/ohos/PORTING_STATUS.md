@@ -317,6 +317,41 @@ SDK 版本需匹配 DevEco 自带 SDK：`6.1.0(23)`（HarmonyOS 6.0.33 / API 23�
 
 HUAWEI MLR-AL10（arm64-v8a，UDID B4BB7C38…）。hdc 连接偶发失效（需 `hdc kill && hdc start`）；启动应用需屏幕解锁。
 
-### Next step
-- 解锁屏幕后启动，确认 QML 启动画面可见；
-- 随后切换 `QtAppConstants.APP_LIBRARY_NAME` → `libmixxx.so`，进入 TASK-004（CoreServices 启动闭环）。
+## Task P1.7 — TASK-003 收官：Qt/QML 启动链真机 PASS
+
+Status: **PASS**（P1 Gate 达成：HAP → Qt QPA → QApplication → QML 可见）
+
+### 最终阻塞点与根因（决定性）
+
+`libqohos.so` 在 HAP 内**存在两份**：
+
+- `libs/arm64-v8a/libqohos.so`（ArkTS `import qpa from 'libqohos.so'` 与 Qt QPA 插件路径 `QT_QPA_PLATFORM_PLUGIN_PATH` 都指向 libs 根）
+- `libs/arm64-v8a/platforms/libqohos.so`（Qt 插件目录结构中的副本）
+
+两份映射 = **两套独立静态状态（peer 注册表）**：ArkUI XComponent 的 `onAttach` 回调在 NAPI 副本里注册了带 windowStage 的 UI peer，
+而 `QOhosWindowProxy::createForExistingMainWindow` 在插件副本里查不到它 → `qFatal`（`makeWindowProxyDataForExistingMainWindowInJsThread`: ability without windowStage）→ SIGABRT。
+
+**修复**：只保留 libs 根的一份（`build-hap.sh` 复制后删除 `platforms/libqohos.so`）。
+
+### 验证证据（2026-09-27）
+
+- 设备：HUAWEI MLR-AL10（API 26 / HarmonyOS 7.0.0.109，arm64-v8a）
+- 启动：`aa start -b com.pomelo.mixxx -a QAbility` → `start ability successfully.`
+- 进程存活（`pidof` 有值），hilog 中 `makeWindowProxyDataForExistingMainWindow` fatal 计数 = 0
+- XComponent surface 创建成功（`handleSurfaceCreated`）
+- 截图：`docs/ohos/logs/mixxx_shot.jpeg` — 深色全屏 + 红色描边卡片 + "Mixxx" + "Qt on HarmonyOS - HAP shell OK"
+
+### 本轮还修复（详见 P1.6 表）
+
+- `libs/arm64` → `libs/arm64-v8a`（ABI 目录名）
+- 捆绑 `libc++_shared.so`
+- QML 窗口延迟显示（`visible:false` + 1.5s 定时）
+- 模板占位符（deviceTypes/orientation/description）
+- 品牌：名称 Mixxx + 用户提供图标（AppScope/layered/startIcon）
+- 页面插桩：`MainWindowNativeNode.ets` 的 XComponent onAttach/onAppear/onDisAppear 打印 hilog
+
+### Next step（TASK-004）
+
+1. `QtAppConstants.APP_LIBRARY_NAME` → `libmixxx.so`，并把 `libmixxx.so` 放入 `entry/libs/arm64-v8a/`；
+2. 定位 CoreServices 首个失败点（数据库/设置目录、TagLib、SoundManager）；
+3. Mixxx QML（`res/qml`）资源部署进 HAP（含 `/qt/qml` 资源前缀与 QML 导入路径）。
