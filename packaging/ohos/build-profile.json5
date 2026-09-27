@@ -1,0 +1,51 @@
+{
+  "app": {
+      "signingConfigs": [
+    {
+      "name": "default",
+      "type": "HarmonyOS",
+      "material": {
+        "certpath": "/data/sign/app_debug.cer",
+        "keyAlias": "Yifengling0",
+        "keyPassword": "Yifengling0",
+        "profile": "/data/sign/mixxx_调试Debug.p7b",
+        "signAlg": "SHA256withECDSA",
+        "storeFile": "/data/sign/app_debug.p12",
+        "storePassword": "Yifengling0"
+      }
+    }
+  ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS",
+        "targetSdkVersion": "6.1.1(24)",
+        "compileSdkVersion": "6.1.1(24)",
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ],
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+  ]
+}
