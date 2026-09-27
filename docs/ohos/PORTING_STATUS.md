@@ -235,5 +235,49 @@ cmake --build /data/mixxx-build/ohos -j 24
 - HAP 打包（packaging/ohos）与真机启动验证（TASK-003/004）。
 - FindFFmpeg 版本检测依赖 pkg-config（CMake 4 cross 下被 sysroot 接管）→ 长期修法待定（显式版本参数为当前 workaround）。
 
+## Task P1.5 — TASK-003：HAP 壳工程 + 打包（签名待材料）
+
+Status: PARTIAL（HAP 构建 PASS；真机安装阻塞在签名材料配对）
+
+### Goal
+HAP 安装 -> Qt QPA -> QApplication -> QML 启动链真机可见。
+
+### Changed files
+- `packaging/ohos/`（基于qtbase `src/harmonyos/templates`，bundleName `com.pomelo.mixxx`）
+  - `entry/src/main/cpp/{qtmixxxboot.cpp,Main.qml,CMakeLists.txt}`：boot 库（QGuiApplication + QML splash）
+  - `build-hap.sh`：boot 编译 + libs 收集（Qt 库/插件/QML + 用户 FFmpeg + libmixxx.so 预留）+ hvigorw assembleHap
+  - `scripts/sign-hap.sh`、`scripts/verify-materials.sh`
+  - `entry/build-profile.json5`：移除 externalNativeOptions（原生库由 build-hap.sh 预编）
+- SDK 版本 `6.1.0(23)` → `6.1.1(24)`（匹配本机 CLT 6.1.1.290）
+
+### Build
+命令：`docker run … winehua-dev bash /data/src/mixxx/packaging/ohos/build-hap.sh`
+结果：**unsigned HAP 产出成功** `entry-default-unsigned.hap`（252,820,929 B；libs/arm64 219 项 188 MB）
+- boot 库 `libqtmixxxboot.so` 交叉编译 + QML 模块打包（qt_add_qml_module）成功
+- hvigor：PackingCheck PASS，卡在 SignHap（需匹配材料，见下）
+
+### Device validation
+设备：HUAWEI MLR-AL10（平板，arm64-v8a，UDID B4BB7C38…7219），hdc 2.0 正常。
+结果：**安装失败（预期）** `install … code:9568322 signature verification failed due to not trusted app source`
+
+### 签名材料配对分析（关键诊断）
+HarmonyOS NEXT 要求 **p12 私钥 / .cer 应用证书 / profile 内嵌证书 三者公钥一致**。现有材料三方不匹配：
+
+| 材料 | 证书指纹(SHA256) | 公钥(SHA256) |
+|---|---|---|
+| `sign/app_debug.p12`（alias `ad`，密码 Yifengling0） | E19822D2… | 14d310f4… |
+| `sign/ad.csr` | — | 14d310f4…（与 p12 一致 ✓） |
+| `sign/app_debug.cer` | df21a3c0…（= .ohos/default_g9 证书） | — |
+| `sign/mixxx_调试Debug.p7b` 内嵌证书 | 93BB5311… | **5f900b73…（无对应私钥）** |
+
+profile 本身合法（verify-profile PASS；bundle-name=com.pomelo.mixxx；type=debug；device-ids 含本机 UDID ✓），
+但它的私钥不在本机。SDK 自带 OpenHarmony 测试根（OpenHarmony.p12/123456）在 HarmonyOS NEXT 商用设备不可用。
+
+### Remaining blocker
+**需要与 profile 配对的私钥**。两条获取路径：
+- A（推荐）：DevEco Studio 打开 `packaging/ohos` → Project Structure → Signing Configs → 勾选自动生成签名（登录华为账号），DevEco 自动生成/复用证书并申请 com.pomelo.mixxx 的 profile；
+- B：AGC 用 `sign/ad.csr` 新建调试证书 → 新 profile → 下载 cer+p7b 替换 `sign/`；
+随后 `scripts/verify-materials.sh` 校验三件套 → `scripts/sign-hap.sh` 签名 → hdc install。
+
 ### Next step
-- TASK-003：packaging/ohos 最小 HAP 壳（hvigor 工程 + libmixxx.so + Qt 运行时 so 捆绑）→ 真机启动。
+- 材料就绪 → 签名安装 → hilog 验证启动链（`[hap]` boot 日志）→ 切 `APP_LIBRARY_NAME=libmixxx.so` 进 TASK-004。
