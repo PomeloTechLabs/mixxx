@@ -36,7 +36,10 @@ rm -rf "${LIBS}"
 mkdir -p "${LIBS}"
 
 # Qt libraries (everything shipped in the cross install tree)
-find "${QT_OHOS}/lib" -maxdepth 1 -name "*.so*" -exec cp -P {} "${LIBS}/" \;
+find "${QT_OHOS}/lib" -maxdepth 1 -name "*.so*" -exec cp -L {} "${LIBS}/" \;
+# C++ runtime: every Qt library is linked against libc++_shared.so
+cp -f "${CLT}/sdk/default/openharmony/native/llvm/lib/aarch64-linux-ohos/libc++_shared.so" \
+   "${LIBS}/"
 # Qt plugins (platforms/, imageformats/, multimedia/, sqldrivers/, ...).
 cp -r "${QT_OHOS}/plugins/." "${LIBS}/"
 # The QPA plugin is also the ArkTS NAPI entry point ("import ... from
@@ -58,10 +61,33 @@ cp -P "${VCPKG_LIB}"/libavcodec.so* "${VCPKG_LIB}"/libavformat.so* \
    "${VCPKG_LIB}"/libavutil.so* "${VCPKG_LIB}"/libswresample.so* \
    "${VCPKG_LIB}"/libswscale.so* "${VCPKG_LIB}"/libavfilter.so* \
    "${VCPKG_LIB}"/libavdevice.so* "${LIBS}/" 2>/dev/null || true
-cp "${REPO}/build/ohos-lib/libmixxx.so" "${LIBS}/" 2>/dev/null || \
-   echo "NOTE: libmixxx.so not staged yet (TASK-004 will add it)"
+# Mixxx application library (built by the Docker cmake build)
+cp -f /data/mixxx-build/ohos/libmixxx.so "${LIBS}/" 2>/dev/null || \
+   echo "NOTE: libmixxx.so not available in the build volume"
+
+# Mixxx resources (skins/qml/controllers/...). Non-.so files inside the HAP's
+# libs/ directory are NOT extracted on install, so they are shipped through
+# resources/resfile/, which the system provides as real files (reachable via
+# the app's resourceDir). Translations are skipped in bring-up.
+RESFILE="${PACK}/entry/src/main/resources/resfile/res"
+rm -rf "${RESFILE}"
+mkdir -p "${RESFILE}"
+for d in qml skins controllers fonts images keyboard shaders effects; do
+  if [ -e "${REPO}/res/${d}" ]; then cp -r "${REPO}/res/${d}" "${RESFILE}/"; fi
+done
+[ -f "${REPO}/res/schema.xml" ] && cp -f "${REPO}/res/schema.xml" "${RESFILE}/"
+
+# Windows-side hvigor cannot stat Linux symlinks, so materialise every one.
+find "${LIBS}" -type l 2>/dev/null | while read -r f; do
+  cp -L "$f" "$f.__tmp" 2>/dev/null && mv -f "$f.__tmp" "$f"
+done
 
 log "libs summary: $(ls "${LIBS}" | wc -l) entries, $(du -sh "${LIBS}" | cut -f1)"
+
+if [ "${STAGE_ONLY:-0}" = "1" ]; then
+  log "STAGE_ONLY=1: skipping hvigor (run it with the DevEco CLI to sign)"
+  exit 0
+fi
 
 log "3/4 node/hvigor environment"
 export NODE_HOME="${CLT}/tool/node"
