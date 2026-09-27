@@ -16,6 +16,73 @@ string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "static" PA_DLL_LINK_WITH_STATIC_RUN
 string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "dynamic" PA_BUILD_SHARED)
 string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "static" PA_BUILD_STATIC)
 
+# HarmonyOS/OHOS: add the OHAudio host API (see ohos/pa_ohos.c).
+if(VCPKG_TARGET_TRIPLET MATCHES "ohos$")
+    file(MAKE_DIRECTORY "${SOURCE_PATH}/src/hostapi/ohos")
+    file(COPY "${CMAKE_CURRENT_LIST_DIR}/ohos/pa_ohos.c"
+         DESTINATION "${SOURCE_PATH}/src/hostapi/ohos")
+
+    # 1) public host API type id
+    vcpkg_replace_string("${SOURCE_PATH}/include/portaudio.h"
+        "    paAudioScienceHPI=14
+} PaHostApiTypeId;"
+        "    paAudioScienceHPI=14,
+    paOHOS=15, /* HarmonyOS NEXT / OpenHarmony OHAudio */
+} PaHostApiTypeId;")
+
+    # 2) hostapi.h: PA_USE_OHOS switch and initializer declaration
+    vcpkg_replace_string("${SOURCE_PATH}/src/common/pa_hostapi.h"
+        "#ifndef PA_USE_SKELETON"
+        "#ifndef PA_USE_OHOS
+#define PA_USE_OHOS 0
+#elif (PA_USE_OHOS != 0) && (PA_USE_OHOS != 1)
+#undef PA_USE_OHOS
+#define PA_USE_OHOS 1
+#endif
+
+PaError PaOhos_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+#if PA_USE_OHOS
+/* nothing else to declare here */
+#endif
+
+#ifndef PA_USE_SKELETON")
+
+    # 3) unix initializer table gets the OHAudio entry first
+    vcpkg_replace_string("${SOURCE_PATH}/src/os/unix/pa_unix_hostapis.c"
+        "PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );"
+        "PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+#if PA_USE_OHOS
+PaError PaOhos_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+#endif")
+
+    vcpkg_replace_string("${SOURCE_PATH}/src/os/unix/pa_unix_hostapis.c"
+        "PaUtilHostApiInitializer *paHostApiInitializers[] =
+    {"
+        "PaUtilHostApiInitializer *paHostApiInitializers[] =
+    {
+#if PA_USE_OHOS
+        PaOhos_Initialize,
+#endif")
+
+    # 4) CMake: build the source, define the switch, link OHAudio
+    vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
+        "SET(PA_SOURCES ${PA_COMMON_SOURCES} ${PA_SKELETON_SOURCES})"
+        "SET(PA_SOURCES ${PA_COMMON_SOURCES} ${PA_SKELETON_SOURCES})
+IF(CMAKE_SYSTEM_NAME STREQUAL \"OHOS\")
+  SET(PA_OHOS_SOURCES src/hostapi/ohos/pa_ohos.c)
+  SOURCE_GROUP(\"hostapi\\\\ohos\" FILES ${PA_OHOS_SOURCES})
+  SET(PA_SOURCES ${PA_SOURCES} ${PA_OHOS_SOURCES})
+  ADD_DEFINITIONS(-DPA_USE_OHOS=1)
+ENDIF()")
+
+    file(APPEND "${SOURCE_PATH}/CMakeLists.txt" "
+IF(CMAKE_SYSTEM_NAME STREQUAL \"OHOS\")
+  TARGET_LINK_LIBRARIES(portaudio ohaudio hilog_ndk.z)
+  TARGET_LINK_LIBRARIES(portaudio_static ohaudio hilog_ndk.z)
+ENDIF()
+")
+endif()
+
 vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
         asio PA_USE_ASIO
