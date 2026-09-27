@@ -1,20 +1,6 @@
 {
   "app": {
-      "signingConfigs": [
-    {
-      "name": "default",
-      "type": "HarmonyOS",
-      "material": {
-        "certpath": "/data/sign/app_debug.cer",
-        "keyAlias": "Yifengling0",
-        "keyPassword": "Yifengling0",
-        "profile": "/data/sign/mixxx_调试Debug.p7b",
-        "signAlg": "SHA256withECDSA",
-        "storeFile": "/data/sign/app_debug.p12",
-        "storePassword": "Yifengling0"
-      }
-    }
-  ],
+      "signingConfigs": [],
     "products": [
       {
         "name": "default",

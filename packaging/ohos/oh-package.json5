@@ -6,8 +6,8 @@
     "@ohos/hamock": "1.0.0"
   },
   "author": "",
-  "name": "ohosqttemplate",
-  "description": "Please describe the basic information.",
+  "name": "mixxx-ohos",
+  "description": "Mixxx HarmonyOS HAP shell",
   "main": "",
   "version": "1.0.0",
   "dependencies": {}
