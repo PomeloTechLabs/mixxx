@@ -174,3 +174,66 @@ Qt for OHOS configure 硬性要求 node-addon-api（QPA 链接 NAPI C++ 头）�
 
 ### Next step
 - Qt cross 完成 → TASK-003 前置：Mixxx OHOS 全量 configure（Qt cross + vcpkg 组合）。
+
+## Task P1.4 — Mixxx OHOS 全量 configure + libmixxx.so 编译
+
+Status: PASS（configure + build 完成；产物待 HAP 打包与真机验证）
+
+### Goal
+Mixxx 源码树在 OHOS 工具链下完成全量 CMake configure 并编译出 `libmixxx.so`（HAP 主模块）。
+
+### Build（最终成功形态）
+```bash
+# 容器：winehua-dev，挂载 mixxx repo / vcpkg volume / qt-out volume / SDK
+export OHOS_SDK_ROOT=/apps/harmony/sdk/default/openharmony
+cmake -S /data/src/mixxx -B /data/mixxx-build/ohos -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=$OHOS_SDK/native/build/cmake/ohos.toolchain.cmake \
+  -DOHOS_ARCH=arm64-v8a \
+  -DCMAKE_FIND_ROOT_PATH="/data/out/qt-ohos;/data/vcpkg/vcpkg/installed/arm64-ohos" \
+  -DQT_HOST_PATH=/data/out/qt-host \
+  -DMIXXX_VCPKG_ROOT=/data/vcpkg/vcpkg \
+  -DVCPKG_TARGET_TRIPLET=arm64-ohos \
+  -DQML=ON -DHID=OFF -DBULK=OFF -DPORTMIDI=OFF -DBROADCAST=OFF \
+  -DVINYLCONTROL=OFF -DQTKEYCHAIN=OFF -DENGINEPRIME=OFF -DKEYFINDER=OFF \
+  -DFFMPEG=ON -DSTEM=ON \
+  -DFFmpeg_AVCODEC_VERSION=61.19.101 -DFFmpeg_AVFORMAT_VERSION=61.7.100 \
+  -DFFmpeg_AVUTIL_VERSION=59.39.100 -DFFmpeg_SWRESAMPLE_VERSION=5.3.100 \
+  -DFFmpeg_{AVCODEC,AVFORMAT,AVUTIL,SWRESAMPLE}_LIBRARIES=<vcpkg>/usr/lib/lib*.so \
+  -DProtobuf_PROTOC_EXECUTABLE=<vcpkg>/packages/protobuf_x64-linux/tools/protobuf/protoc \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build /data/mixxx-build/ohos -j 24
+```
+
+### 产物（2026-09-27 验证）
+- `libmixxx.so`：34,980,144 字节，AArch64 DYN（HAP 模块）✅
+- DT_NEEDED：ffmpeg 动态库（用户 7.1.1 预编译 .so）+ libGLESv3 + Qt6 各模块
+
+### 关键修复清单（迭代 configure1-13 / build1-24）
+| 层 | 问题 | 修复 |
+|---|---|---|
+| CMake | WSL 守卫误报（vcpkg triplet 不含 toolchain 名） | triplet 名匹配跳过 |
+| CMake | MIXXX_VCPKG_ROOT 校验假设 buildenv 包 | ohos triplet 放行标准 vcpkg checkout |
+| CMake | OHOS 编译定义分支在 UNIX 后不可达 | 分支前移（OHOS 在 toolchain 下 UNIX=TRUE） |
+| CMake | HAP 模块缺 LIBRARY DESTINATION | install 排除 OHOS（打包由 packaging/ohos） |
+| CMake | 桌面 GL 依赖 | OHOS 分支显式链 sysroot GLESv3 + QT_OPENGL_ES_2 |
+| CMake | X11/DBus/Upower/QTKEYCHAIN/ENGINEPRIME/KEYFINDER | 桌面栈按 option/条件跳过 |
+| CMake | SQLite3 alias 在未找到时崩 | 防御性 target 存在检查 |
+| CMake | sleef/sleefdft/mpg123/OpenMP 传递闭包 | OHOS 显式闭包（libmpg123.a + -static-openmp） |
+| Qt | 缺 Core5Compat/Multimedia（OHOS 后端） | 补编 qt5compat + qtmultimedia（libohosmediaplugin.so） |
+| vcpkg | lame 3.100 config.sub 不识 ohos 三元组 | overlay port 更新 GNU config 工具 |
+| vcpkg | freetype→libpng genout 无法处理 multiarch 头 | freetype overlay 去 png |
+| FFmpeg | NEON 汇编非 PIC 无法链入 so | **采用用户预编译 FFmpeg 7.1.1 共享库**（F:\MyProject\third_party_ffmpeg，avcodec 61.19.101，满足 ≥58.35.100；vcpkg 9.0.2 的头/库备份在 installed/ffmpeg902-backup/） |
+| 源码 | CfgkeyAndShortcut 聚合括号初始化（NDK clang 15） | 显式构造函数 |
+| 源码 | desktophelper freedesktop DBus | OHOS 走 QDesktopServices |
+| pkg-config | CMake 4 cross 用 sysroot 覆盖 PKG_CONFIG_LIBDIR | 版本号显式传 cache 变量 |
+
+### Evidence
+- `docs/ohos/logs/mixxx-ohos-configure1-13.log`、`mixxx-ohos-build1-24.log`
+- `[OHOS] Qt6 6.13.0, QML=ON, HID=OFF, BULK=OFF, BROADCAST=OFF, VINYLCONTROL=OFF, FFMPEG=ON, STEM=ON`
+
+### Remaining blocker
+- HAP 打包（packaging/ohos）与真机启动验证（TASK-003/004）。
+- FindFFmpeg 版本检测依赖 pkg-config（CMake 4 cross 下被 sysroot 接管）→ 长期修法待定（显式版本参数为当前 workaround）。
+
+### Next step
+- TASK-003：packaging/ohos 最小 HAP 壳（hvigor 工程 + libmixxx.so + Qt 运行时 so 捆绑）→ 真机启动。
