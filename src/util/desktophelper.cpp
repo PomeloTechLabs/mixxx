@@ -7,7 +7,7 @@
 #include <QUrl>
 #include <QProcess>
 
-#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID) && !defined(MIXXX_OS_OHOS) && !defined(MIXXX_OS_OHOS)
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QFileInfo>
@@ -27,6 +27,8 @@ QString getSelectInFileBrowserCommand() {
 #elif defined(Q_OS_ANDROID)
     // TODO emit android intent
     return "";
+#elif defined(MIXXX_OS_OHOS)
+    return ""; // no special command, use QDesktopServices
 #elif defined(Q_OS_LINUX)
     QProcess proc;
     QString output;
@@ -61,7 +63,7 @@ QString removeChildDir(const QString& path) {
     return path.left(index);
 }
 
-#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID) && !defined(MIXXX_OS_OHOS)
 bool selectInFreedesktop(const QString& path) {
     const QUrl fileurl = QUrl::fromLocalFile(path);
     const QStringList args(fileurl.toString());
@@ -128,7 +130,7 @@ void DesktopHelper::openInFileBrowser(const QStringList& paths) {
 
         if (fileInfo.exists()) {
             // Tryto select the file
-#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID) && !defined(MIXXX_OS_OHOS)
             if (sSelectInFileBrowserCommand == kSelectInFreedesktop) {
                 if (selectInFreedesktop(path)) {
                     openedDirs.insert(dirPath);
