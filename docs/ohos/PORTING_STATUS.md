@@ -355,3 +355,37 @@ Status: **PASS**（P1 Gate 达成：HAP → Qt QPA → QApplication → QML 可�
 1. `QtAppConstants.APP_LIBRARY_NAME` → `libmixxx.so`，并把 `libmixxx.so` 放入 `entry/libs/arm64-v8a/`；
 2. 定位 CoreServices 首个失败点（数据库/设置目录、TagLib、SoundManager）；
 3. Mixxx QML（`res/qml`）资源部署进 HAP（含 `/qt/qml` 资源前缀与 QML 导入路径）。
+
+## Task P1.8 — TASK-004 达成：真正的 Mixxx 界面在真机运行
+
+Status: **PASS**（CoreServices 启动闭环 + 完整 Mixxx UI 上屏）
+
+### 关键改动
+
+1. **引导目标切换**：`QtAppConstants.APP_LIBRARY_NAME` → `libmixxx.so`（真正的 Mixxx `main()`），HAP 同时携带 `libmixxx.so`、Qt QML 模块与 Mixxx 资源。
+2. **资源部署（决定性）**：HAP 的 `libs/` 目录**只提取 .so**，普通文件在安装时被忽略——实测 `bundleCodeDir/libs/arm64/res` 在设备上不存在，Mixxx 报
+   `Critical: Skin directory does not exist`。改为经由 `resources/resfile/res/**` 交付：系统会以**真实文件**形式释放到
+   `<bundleCodeDir>/<module>/resources/resfile/res`（实测 `/data/storage/el1/bundle/entry/resources/resfile/res`，9 个子目录齐全）。
+3. **路径注入**：`QAbilityStage` 在启动 Qt 前解析资源目录（`resourceDir` 在 ApplicationContext 上为空，因此按候选列表探测并要求
+   `skins/` 子目录存在）并通过 `appArgs` 传入 `--resource-path`；`--settings-path` 指向应用沙箱 `filesDir/.mixxx`（数据库/配置落在此处）。
+4. **诊断开关**：`QAbilityStage` 把资源候选路径与 Mixxx 自己的 `mixxx.log` 尾部打印到 hilog（P5 完成后移除）。
+5. `build-hap.sh`：资源改入 resfile；`STAGE_ONLY=1` 只做暂存，签名交给 DevEco CLI。
+
+### 验证（HUAWEI MLR-AL10，API 26 / HarmonyOS 7.0.0.109）
+
+- CoreServices 正常初始化：数据库 schema 由 0 升级到 v33+（`SchemaManager` 日志）
+- Mixxx 自有对话框渲染正常（"no output sound devices" 警告框——音频后端属 P4 范围；菜单栏设置询问框）
+- 完整 UI 上屏（截图 `docs/ohos/logs/mixxx_shot10.jpeg`）：
+  - 菜单栏 **File | Library | View | Options | Help**
+  - 顶部栏：BIG LIBRARY / WAVEFORMS / 4 DECKS / MIXER / EFFECTS / SAMPLERS / MIC-AUX + 时钟 + Buffer% + REC + ON
+  - 双 Deck（CUE、热键 1-8、Loop、变速 ±8%、Filter、BPM/SYNC、FX1-2）
+  - Mixer（EQ H/M/L 三色环旋钮、MAIN/BAL、HEAD MIX/SPLIT、FX1-4、推子）、滤波与交叉推子
+  - MIC 1-4 / AUX 1-4
+  - 底部 Library 面板（Preview + Cover Art / Last Played / Album / Artist / Title）
+
+### Remaining（后续阶段）
+
+- 音频输出：PortAudio 无 OHOS hostapi → P4（`pa_ohos` + OHAudio）
+- 音乐导入：系统 Picker + Library 扫描 → P5（当前目录选择器为系统文件选择器，可正常弹出）
+- 翻译资源未随包（`res/translations` 75MB 暂略）
+- `QAbilityStage` 诊断代码与 C++ 侧 `MIXXX_OS_OHOS` 资源分支保留（后者是正式实现，前者待清理）
