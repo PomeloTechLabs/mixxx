@@ -4941,8 +4941,8 @@ if(RUBBERBAND)
     # sleef[dft] is built with OpenMP and libsndfile's mpeg feature pulls in
     # mpg123; their imported targets do not survive the OHOS find round-trip,
     # so close the transitive closures explicitly. libomp comes from the NDK
-    # via -static-openmp.
-    target_link_options(mixxx-lib PRIVATE -fopenmp -static-openmp)
+    # via -static-openmp; INTERFACE so it reaches the final libmixxx.so link.
+    target_link_options(mixxx-lib INTERFACE -fopenmp -static-openmp)
     target_link_libraries(
       mixxx-lib
       PRIVATE
