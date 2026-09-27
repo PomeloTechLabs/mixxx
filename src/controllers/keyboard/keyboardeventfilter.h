@@ -34,6 +34,13 @@ class KeyboardEventFilter : public QObject {
     struct CfgkeyAndShortcut {
         ConfigKey cfgKey;
         QString defaultShortcut;
+        // Explicit constructors keep this compiling on toolchains with
+        // incomplete C++20 parenthesized-aggregate-initialization support
+        // (e.g. the OHOS NDK clang 15).
+        CfgkeyAndShortcut() = default;
+        CfgkeyAndShortcut(ConfigKey key, QString shortcut)
+                : cfgKey(std::move(key)), defaultShortcut(std::move(shortcut)) {
+        }
     };
 
     // Returns a valid QString with modifier keys from a QKeyEvent
