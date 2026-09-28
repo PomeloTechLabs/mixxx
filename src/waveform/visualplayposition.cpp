@@ -157,13 +157,21 @@ bool VisualPlayPosition::getPlaySlipAtNextVSync(
     VisualPlayPositionData data;
     std::size_t i = 0;
     double offsetBuffers = 0;
+#ifdef MIXXX_OS_OHOS
+    // Autonomously AI-generated comment.
+    // OHAudio may prepare several engine buffers in one host callback. The
+    // newest three snapshots can all be ahead of the DAC, so include more
+    // history while staying within half of the 16-entry ring.
+    // End of autonomously AI-generated comment.
+    constexpr std::size_t kMaxPositionHistory = 8;
+#else
+    constexpr std::size_t kMaxPositionHistory = 3;
+#endif
     // Work around #15886: Don't use the most recent buffer right away because
     // it likely not reached the DAC. This has caused a visible jump back, from
     // the correct pause position to a too early position when start playing.
-    for (; i < 3; ++i) {
+    for (; i < kMaxPositionHistory; ++i) {
         // Find buffer that is currently in the DAC.
-        // This is either at 0 or 1, but can also be at 2, if the buffer has
-        // been updated conurrently during the loop
         if (m_data.getAt(i, &data)) {
             offsetBuffers = calcOffsetAtNextVSync(pSyncTimeProvider, data);
             if (offsetBuffers > -1) {
@@ -172,7 +180,7 @@ bool VisualPlayPosition::getPlaySlipAtNextVSync(
             }
         }
     }
-    if (i >= 3) {
+    if (i >= kMaxPositionHistory) {
         // No valid data available e.g, track ejected
         return false;
     }

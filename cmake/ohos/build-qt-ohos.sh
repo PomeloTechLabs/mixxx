@@ -224,6 +224,20 @@ build_cross() {
 }
 
 verify_pins
+QT_INPUT_PATCH="${SCRIPT_DIR}/patches/qt-ohos-touch-window-coordinates.patch"
+sed -i 's/\r$//' "${QT_SRC_ROOT}/qtbase/src/plugins/platforms/ohos/qohosinputmethodeventhandler.cpp"
+if patch -d "${QT_SRC_ROOT}" -p1 --dry-run --reverse --batch < "${QT_INPUT_PATCH}" >/dev/null 2>&1; then
+  log "Qt window touch coordinate patch already applied"
+else
+  patch -d "${QT_SRC_ROOT}" -p1 --forward --batch < "${QT_INPUT_PATCH}"
+fi
+QT_POPUP_PATCH="${SCRIPT_DIR}/patches/qt-ohos-popup-geometry.patch"
+sed -i 's/\r$//' "${QT_SRC_ROOT}/qtbase/src/plugins/platforms/ohos/qohosfloatingwindow.cpp"
+if patch -d "${QT_SRC_ROOT}" -p1 --dry-run --reverse --batch < "${QT_POPUP_PATCH}" >/dev/null 2>&1; then
+  log "Qt popup geometry patch already applied"
+else
+  patch -d "${QT_SRC_ROOT}" -p1 --forward --batch < "${QT_POPUP_PATCH}"
+fi
 ensure_host_deps
 
 case "${STAGE}" in

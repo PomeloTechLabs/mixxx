@@ -13,6 +13,7 @@
 #include <QString>
 #include <QTextStream>
 #include <QThread>
+#include <QTemporaryFile>
 #include <atomic>
 #include <string_view>
 
@@ -30,6 +31,8 @@ QMutex s_mutexStdErr;
 
 // The file handle for Mixxx's log file.
 QFile s_logfile;
+QFile s_publicLogfile;
+QString s_publicLogPath;
 qint64 s_logMaxFileSize = mixxx::kLogMaxFileSizeDefault;
 std::atomic<bool> s_logMaxFileSizeReached = false;
 
@@ -176,10 +179,16 @@ inline void writeToFile(
             flush = true;
         }
         const int written = s_logfile.write(formattedMessage);
+        if (s_publicLogfile.isOpen()) {
+            s_publicLogfile.write(formattedMessage);
+        }
         Q_UNUSED(written);
         DEBUG_ASSERT(written == formattedMessage.size());
         if (flush) {
             const bool flushed = s_logfile.flush();
+            if (s_publicLogfile.isOpen()) {
+                s_publicLogfile.flush();
+            }
             Q_UNUSED(flushed);
             DEBUG_ASSERT(flushed);
         }
@@ -467,6 +476,7 @@ void Logging::shutdown() {
     if (s_logfile.isOpen()) {
         s_logfile.close();
     }
+    s_publicLogfile.close();
 }
 
 // static
@@ -475,6 +485,36 @@ void Logging::flushLogFile() {
     if (s_logfile.isOpen()) {
         s_logfile.flush();
     }
+    if (s_publicLogfile.isOpen()) {
+        s_publicLogfile.flush();
+    }
+}
+
+bool Logging::mirrorLogToDirectory(const QString& logDirPath) {
+    QMutexLocker locker(&s_mutexLogfile);
+    if (s_publicLogfile.isOpen()) {
+        return true;
+    }
+    if (!s_logfile.isOpen() || logDirPath.isEmpty() || !QDir().mkpath(logDirPath)) {
+        return false;
+    }
+    if (s_publicLogPath.isEmpty()) {
+        QTemporaryFile probe(QDir(logDirPath).filePath(QStringLiteral(".mixxx-log-XXXXXX")));
+        if (!probe.open()) {
+            return false;
+        }
+        s_publicLogPath = rotateLogFilesAndGetFilePath(logDirPath);
+    }
+    if (s_publicLogPath.isEmpty()) {
+        return false;
+    }
+    s_logfile.flush();
+    QFile::remove(s_publicLogPath);
+    if (!QFile::copy(s_logfile.fileName(), s_publicLogPath)) {
+        return false;
+    }
+    s_publicLogfile.setFileName(s_publicLogPath);
+    return s_publicLogfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
 }
 
 } // namespace mixxx

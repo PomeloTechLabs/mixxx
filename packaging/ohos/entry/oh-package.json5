@@ -1,7 +1,7 @@
 {
   "license": "",
   "devDependencies": {
-    "@types/libentry.so": "file:./src/main/cpp/types/libentry",
+    "@types/libmixxxohosmedia.so": "file:./src/main/cpp/types/libmixxxohosmedia",
     "@types/libqohos.so": "file:./src/main/qt"
   },
   "author": "",

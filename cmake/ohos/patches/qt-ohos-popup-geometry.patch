@@ -1,0 +1,29 @@
+--- a/qtbase/src/plugins/platforms/ohos/qohosfloatingwindow.cpp
++++ b/qtbase/src/plugins/platforms/ohos/qohosfloatingwindow.cpp
+@@ -5,6 +5,7 @@
+ 
+ #include <QtCore/private/qohoslogger_p.h>
+ #include "QtGui/private/qguiapplication_p.h"
++#include <QtGui/private/qhighdpiscaling_p.h>
+ #include <QtGui/private/qwindow_p.h>
+ #include <qohosdeviceinfo_p.h>
+ #include <qohosinputcontext.h>
+@@ -27,7 +28,7 @@
+ {
+     return !QOhosSettings::instance().isWindowPcModeEnabled()
+         && rectChangeOptions.rect.isValid()
+-        && window->geometry() != rectChangeOptions.rect
++        && QHighDpi::toNativePixels(window->size(), window) != rectChangeOptions.rect.size()
+         && rectChangeOptions.reason == QOhosWindowProxy::RectChangeReason::UNDEFINED;
+ }
+ 
+@@ -470,7 +471,8 @@
+ 
+     startAsyncWaitForNodeResizeIfNeeded();
+ 
+-    if (isWindowRotatedByTabletScreenRotation(window(), rectChangeOptions))
++    if (m_view->viewType() == QOhosView::ViewType::MainWindow
++        && isWindowRotatedByTabletScreenRotation(window(), rectChangeOptions))
+         needsCloseAllActivePopups = true;
+ 
+     if (needsCloseAllActivePopups)

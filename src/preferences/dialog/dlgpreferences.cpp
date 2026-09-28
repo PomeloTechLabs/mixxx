@@ -497,12 +497,18 @@ void DlgPreferences::slotButtonPressed(QAbstractButton* pButton) {
         break;
     case QDialogButtonBox::ApplyRole:
         emit applyPreferences();
+#ifdef MIXXX_OS_OHOS
+        m_pConfig->save();
+#endif
         if (!pendingConfigValidOnAllPages()) {
             return;
         }
         break;
     case QDialogButtonBox::AcceptRole:
         emit applyPreferences();
+#ifdef MIXXX_OS_OHOS
+        m_pConfig->save();
+#endif
         if (!pendingConfigValidOnAllPages()) {
             return;
         }

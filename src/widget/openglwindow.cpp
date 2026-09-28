@@ -33,7 +33,11 @@ void OpenGLWindow::initializeGL() {
 }
 
 void OpenGLWindow::paintGL() {
+#ifdef MIXXX_OS_OHOS
+    if (m_pWidget && m_pWidget->shouldRender()) {
+#else
     if (m_pWidget && isExposed()) {
+#endif
         m_pWidget->paintGL();
     }
 }
@@ -46,9 +50,11 @@ void OpenGLWindow::resizeGL(int w, int h) {
         // QGLWidget::resizeGL has devicePixelRatio applied, so we mimic the same behaviour
         m_pWidget->resizeGL(static_cast<int>(static_cast<float>(w) * devicePixelRatio()),
                 static_cast<int>(static_cast<float>(h) * devicePixelRatio()));
+#ifndef MIXXX_OS_OHOS
         // additional paint and swap to avoid flickering
         m_pWidget->paintGL();
         m_pWidget->swapBuffers();
+#endif
 
         m_pWidget->doneCurrent();
     }

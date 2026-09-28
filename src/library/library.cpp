@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QMessageBox>
+#include <QTimer>
 
 #include "control/controlobject.h"
 #include "controllers/keyboard/keyboardeventfilter.h"
@@ -35,6 +36,7 @@
 #include "mixer/playermanager.h"
 #include "moc_library.cpp"
 #include "util/assert.h"
+#include "util/cmdlineargs.h"
 #include "util/logger.h"
 #include "util/sandbox.h"
 #include "widget/wlibrary.h"
@@ -257,6 +259,8 @@ Library::Library(
         }
     }
 
+    registerLauncherMediaDirectory(30);
+
     m_iTrackTableRowHeight = m_pConfig->getValue(
             ConfigKey(kConfigGroup, "RowHeight"), kDefaultRowHeightPx);
     QString fontStr =
@@ -274,6 +278,33 @@ Library::Library(
 
 Library::~Library() {
     DateFormatChangedBroadcaster::destroy();
+}
+
+void Library::registerLauncherMediaDirectory(int remainingAttempts) {
+    if (!CmdlineArgs::Instance().getMediaPathProvided()) {
+        return;
+    }
+    const mixxx::FileInfo mediaDir(CmdlineArgs::Instance().getMediaPath());
+    if (!mediaDir.exists() || !mediaDir.isDir()) {
+        if (remainingAttempts > 0) {
+            QTimer::singleShot(1000, this, [this, remainingAttempts]() {
+                registerLauncherMediaDirectory(remainingAttempts - 1);
+            });
+        } else {
+            kLogger.warning() << "Launcher-provided music folder is unavailable" << mediaDir;
+        }
+        return;
+    }
+    const auto result = m_pTrackCollectionManager->addDirectory(mediaDir);
+    if (result == DirectoryDAO::AddResult::Ok ||
+            result == DirectoryDAO::AddResult::AlreadyWatching) {
+        kLogger.info() << "Registered launcher-provided music folder" << mediaDir;
+        if (remainingAttempts < 30) {
+            m_pTrackCollectionManager->startLibraryAutoScan();
+        }
+    } else {
+        kLogger.warning() << "Failed to register launcher-provided music folder" << mediaDir;
+    }
 }
 
 TrackCollectionManager* Library::trackCollectionManager() const {

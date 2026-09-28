@@ -64,6 +64,7 @@ cp -P "${VCPKG_LIB}"/libavcodec.so* "${VCPKG_LIB}"/libavformat.so* \
 # Mixxx application library (built by the Docker cmake build)
 cp -f /data/mixxx-build/ohos/libmixxx.so "${LIBS}/" 2>/dev/null || \
    echo "NOTE: libmixxx.so not available in the build volume"
+cp -f /data/mixxx-build/ohos/libmixxxohosmedia.so "${LIBS}/"
 
 # Mixxx resources (skins/qml/controllers/...). Non-.so files inside the HAP's
 # libs/ directory are NOT extracted on install, so they are shipped through
@@ -76,6 +77,15 @@ for d in qml skins controllers fonts images keyboard shaders effects; do
   if [ -e "${REPO}/res/${d}" ]; then cp -r "${REPO}/res/${d}" "${RESFILE}/"; fi
 done
 [ -f "${REPO}/res/schema.xml" ] && cp -f "${REPO}/res/schema.xml" "${RESFILE}/"
+cp -f "${REPO}/res/keyboard/en_US.kbd.cfg" "${RESFILE}/"
+
+# Translations (compiled .qm only; the .ts sources are not needed at runtime).
+# Mixxx looks them up in <resource-path>/translations.
+mkdir -p "${RESFILE}/translations"
+find "${REPO}/res/translations" -maxdepth 1 -name "*.qm" -exec cp {} "${RESFILE}/translations/" \;
+if [ -d "${QT_OHOS}/translations" ]; then
+  find "${QT_OHOS}/translations" -maxdepth 1 -name "*.qm" -exec cp {} "${RESFILE}/translations/" \;
+fi
 
 # Windows-side hvigor cannot stat Linux symlinks, so materialise every one.
 find "${LIBS}" -type l 2>/dev/null | while read -r f; do

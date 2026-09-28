@@ -1,6 +1,7 @@
 #include "rendergraph/materialshader.h"
 
 #include <QFile>
+#include <QOpenGLContext>
 #ifdef USE_QSHADER_FOR_GL
 #include <rhi/qshader.h>
 #endif
@@ -21,9 +22,36 @@ QByteArray loadShaderCodeFromFile(const QString& path) {
         qWarning() << "Failed to open the shader file:" << path;
         return QByteArray();
     }
-    QShader qsbShader = QShader::fromSerialized(file.readAll());
-    QShaderKey key(QShader::GlslShader, 120);
-    return qsbShader.shader(key).shader();
+    const QShader qsbShader = QShader::fromSerialized(file.readAll());
+    // A .qsb bundle carries one GLSL flavour per target: GLSL ES for OpenGL ES
+    // contexts (Android, HarmonyOS) and core GLSL for desktop. Which one is
+    // compilable follows from the current context, not from the build target,
+    // so ask the context instead of hard-coding a version. Requesting a variant
+    // the bundle does not contain yields an empty shader, which only surfaces
+    // later as "Link failed because of missing fragment shader".
+    const QOpenGLContext* context = QOpenGLContext::currentContext();
+    const bool wantsGlslEs = context && context->isOpenGLES();
+
+    QByteArray firstGlslVariant;
+    for (const QShaderKey& key : qsbShader.availableShaders()) {
+        if (key.source() != QShader::GlslShader) {
+            continue;
+        }
+        const QByteArray code = qsbShader.shader(key).shader();
+        if (code.isEmpty()) {
+            continue;
+        }
+        if (key.sourceVersion().flags().testFlag(QShaderVersion::GlslEs) == wantsGlslEs) {
+            return code;
+        }
+        if (firstGlslVariant.isEmpty()) {
+            firstGlslVariant = code;
+        }
+    }
+    if (firstGlslVariant.isEmpty()) {
+        qWarning() << "Shader bundle contains no GLSL variant:" << path;
+    }
+    return firstGlslVariant;
 }
 #else
 QString resource(const QString& filename) {

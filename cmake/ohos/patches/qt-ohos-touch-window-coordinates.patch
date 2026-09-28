@@ -1,0 +1,40 @@
+--- a/qtbase/src/plugins/platforms/ohos/qohosinputmethodeventhandler.cpp
++++ b/qtbase/src/plugins/platforms/ohos/qohosinputmethodeventhandler.cpp
+@@ -227,7 +227,17 @@
+ 
+     for (const auto &touchPointData : touchPoints) {
+         const auto &touchPoint = touchPointData.touchPoint;
+-        QPointF clickPoint = touchPointData.displayPosition;
++        const QPointF localPosition(touchPoint.x, touchPoint.y);
++        const QPointF clickPoint = targetWindow != nullptr
++            ? QHighDpi::toNativeGlobalPosition(
++                targetWindow->mapToGlobal(QHighDpi::fromNativeLocalPosition(localPosition, targetWindow)),
++                targetWindow) - displayOffset
++            : touchPointData.displayPosition;
++        if (touchPoint.type == OH_NATIVEXCOMPONENT_DOWN) {
++            qInfo() << "OHOS native touch" << targetWindow
++                    << "local" << localPosition << "display" << touchPointData.displayPosition
++                    << "mapped" << clickPoint + displayOffset;
++        }
+ 
+         switch (touchPointData.toolType) {
+         case ::OH_NATIVEXCOMPONENT_TOOL_TYPE_FINGER: {
+@@ -236,7 +246,7 @@
+                     .value_or(QEventPoint::State::Stationary);
+ 
+             if (state != QEventPoint::State::Released)
+-                activeTouchPointDisplayPositions.push_back(touchPointData.displayPosition.toPoint());
++                activeTouchPointDisplayPositions.push_back(clickPoint.toPoint());
+ 
+             QWindowSystemInterface::TouchPoint qwsiTouchPoint;
+             qwsiTouchPoint.id = touchPoint.id;
+@@ -540,6 +550,9 @@
+         eventBatch.end());
+ 
+     for (const auto &touchEvent : eventBatch) {
++        if (m_lastWsiTouchEvent && m_lastWsiTouchEvent->timestampMs == touchEvent.timestamp
++            && m_lastWsiTouchEvent->targetWindow == targetWindow)
++            continue;
+         if (touchEvent.action == QEvent::NonClientAreaMouseButtonPress)
+             m_optNonClientAreaTouchPointerId = touchEvent.id;
+         else if (m_optNonClientAreaTouchPointerId != touchEvent.id)

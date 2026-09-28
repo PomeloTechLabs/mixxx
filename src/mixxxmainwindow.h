@@ -17,6 +17,12 @@ class GuiTick;
 class LaunchImage;
 class VisualsManager;
 class WMainMenuBar;
+#ifdef MIXXX_OS_OHOS
+namespace mixxx::ohos {
+class WindowAdapter;
+class MediaController;
+}
+#endif
 struct LibraryScanResultSummary;
 
 namespace mixxx {
@@ -127,6 +133,10 @@ class MixxxMainWindow : public QMainWindow {
     std::shared_ptr<mixxx::CoreServices> m_pCoreServices;
 
     QWidget* m_pCentralWidget;
+#ifdef MIXXX_OS_OHOS
+    mixxx::ohos::WindowAdapter* m_pOhosWindow = nullptr;
+    mixxx::ohos::MediaController* m_pOhosMedia = nullptr;
+#endif
     LaunchImage* m_pLaunchImage;
 #ifndef __APPLE__
     Qt::WindowStates m_prevState;

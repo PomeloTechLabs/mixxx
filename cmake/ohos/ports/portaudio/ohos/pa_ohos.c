@@ -9,6 +9,8 @@
  */
 
 #include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,10 +48,13 @@ typedef struct PaOhosHostApiRepresentation PaOhosHostApiRepresentation;
 
 typedef struct PaOhosStream
 {
-    PaOhosHostApiRepresentation* hostApi;
+    /* PortAudio casts a PaStream* back to PaUtilStreamRepresentation* and
+       checks its magic, so the representation has to come first. */
     PaUtilStreamRepresentation streamRepresentation;
     PaUtilCpuLoadMeasurer cpuLoadMeasurer;
     PaUtilBufferProcessor bufferProcessor;
+
+    PaOhosHostApiRepresentation* hostApi;
 
     OH_AudioStreamBuilder* builder;
     OH_AudioRenderer* renderer;
@@ -147,7 +152,12 @@ static int32_t ohosRendererOnWriteData(
 
     int callbackResult = paContinue;
     PaUtil_BeginBufferProcessing(&stream->bufferProcessor, &timeInfo, 0);
-    PaUtil_SetNoInput(&stream->bufferProcessor);
+    // Output only: PaUtil_SetNoInput() writes through hostInputChannels, which
+    // is allocated only for streams that actually have inputs. Calling it here
+    // dereferences a NULL array and crashes the renderer callback thread.
+    if (stream->bufferProcessor.inputChannelCount > 0) {
+        PaUtil_SetNoInput(&stream->bufferProcessor);
+    }
     PaUtil_SetOutputFrameCount(&stream->bufferProcessor, (unsigned int)frames);
     PaUtil_SetInterleavedOutputChannels(
             &stream->bufferProcessor, 0, buffer, stream->outputChannelCount);
@@ -471,17 +481,6 @@ static PaError OpenStream(PaUtilHostApiRepresentation* hostApi, PaStream** s,
             Pa_GetSampleSize(stream->hostOutputSampleFormat) * stream->outputChannelCount;
     resetStreamState(stream);
 
-    result = PaUtil_InitializeBufferProcessor(&stream->bufferProcessor,
-            0, /* numInputChannels */
-            paInt16, /* inputSampleFormat */
-            paInt16, /* hostInputSampleFormat */
-            outputParameters->channelCount, outputParameters->sampleFormat,
-            stream->hostOutputSampleFormat, sampleRate, streamFlags, framesPerBuffer,
-            framesPerHostBuffer, paUtilFixedHostBufferSize, streamCallback, userData);
-    if (result != paNoError) {
-        goto error;
-    }
-
     /* Create the OHAudio renderer. */
     OH_AudioStream_Result audioResult =
             OH_AudioStreamBuilder_Create(&stream->builder, AUDIOSTREAM_TYPE_RENDERER);
@@ -511,8 +510,45 @@ static PaError OpenStream(PaUtilHostApiRepresentation* hostApi, PaStream** s,
         goto error;
     }
 
-    PA_OHOS_LOG("stream opened: %d Hz, %d ch, %lu frames/host buffer", (int)sampleRate,
-            outputParameters->channelCount, framesPerHostBuffer);
+    int32_t rendererRate = 0;
+    int32_t rendererFrames = 0;
+    if (OH_AudioRenderer_GetSamplingRate(stream->renderer, &rendererRate) != AUDIOSTREAM_SUCCESS ||
+            rendererRate <= 0 ||
+            OH_AudioRenderer_GetFrameSizeInCallback(stream->renderer, &rendererFrames) !=
+                    AUDIOSTREAM_SUCCESS ||
+            rendererFrames <= 0) {
+        result = paUnanticipatedHostError;
+        goto error;
+    }
+    stream->sampleRate = rendererRate;
+    stream->framesPerHostBuffer = (unsigned long)rendererFrames;
+    PaUtil_InitializeCpuLoadMeasurer(&stream->cpuLoadMeasurer, stream->sampleRate);
+    result = PaUtil_InitializeBufferProcessor(&stream->bufferProcessor,
+            0,
+            paInt16,
+            paInt16,
+            outputParameters->channelCount, outputParameters->sampleFormat,
+            stream->hostOutputSampleFormat, stream->sampleRate, streamFlags, framesPerBuffer,
+            stream->framesPerHostBuffer, paUtilFixedHostBufferSize, streamCallback, userData);
+    if (result != paNoError) {
+        goto error;
+    }
+
+    int32_t latencyMs = 0;
+    double rendererLatency = (double)stream->framesPerHostBuffer / stream->sampleRate;
+    if (OH_AudioRenderer_GetLatency(stream->renderer, AUDIOSTREAM_LATENCY_TYPE_ALL, &latencyMs) ==
+                    AUDIOSTREAM_SUCCESS &&
+            latencyMs > 0) {
+        rendererLatency = latencyMs / 1000.0;
+    }
+    stream->streamRepresentation.streamInfo.structVersion = 1;
+    stream->streamRepresentation.streamInfo.sampleRate = stream->sampleRate;
+    stream->streamRepresentation.streamInfo.outputLatency = rendererLatency +
+            PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor) /
+                    stream->sampleRate;
+
+    PA_OHOS_LOG("stream opened: %{public}d Hz, %{public}d ch, %{public}lu frames/host buffer",
+            rendererRate, outputParameters->channelCount, stream->framesPerHostBuffer);
 
     *s = (PaStream*)stream;
     return result;

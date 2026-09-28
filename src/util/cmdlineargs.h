@@ -88,6 +88,17 @@ class CmdlineArgs final {
         }
     }
     const QString& getResourcePath() const { return m_resourcePath; }
+    // Directory Mixxx treats as the user's music folder. HarmonyOS grants an
+    // app access only to its own app-scoped directory, so the launcher passes
+    // it explicitly via --media-path instead of relying on a system folder
+    // picker. Falls back to the operating system location when unset.
+    QString getMediaPath() const;
+    // Whether --media-path was supplied, as opposed to falling back to the
+    // operating system location.
+    bool getMediaPathProvided() const { return !m_mediaPath.isEmpty(); }
+    void setMediaPath(const QString& newMediaPath) {
+        m_mediaPath = QDir::toNativeSeparators(newMediaPath);
+    }
     const QString& getTimelinePath() const { return m_timelinePath; }
 
     const QString& getStyle() const {
@@ -136,6 +147,7 @@ class CmdlineArgs final {
     QString m_locale;
     QString m_settingsPath;
     QString m_resourcePath;
+    QString m_mediaPath;
     QString m_timelinePath;
     QString m_styleName;
 };

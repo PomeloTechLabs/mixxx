@@ -5,6 +5,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QtGlobal>
 #include <gsl/pointers>
 
@@ -479,6 +480,19 @@ void CoreServices::initializeLogging() {
             m_cmdlineArgs.getLogLevel(),
             m_cmdlineArgs.getLogFlushLevel(),
             logFlags);
+#ifdef MIXXX_OS_OHOS
+    const auto mediaPath = m_cmdlineArgs.getMediaPath();
+    const auto logDir = mediaPath.isEmpty()
+            ? QString() : QDir(mediaPath).absoluteFilePath(QStringLiteral("../logs"));
+    auto* logTimer = new QTimer(this);
+    connect(logTimer, &QTimer::timeout, this, [logDir] {
+        if (mixxx::Logging::mirrorLogToDirectory(logDir)) {
+            mixxx::Logging::flushLogFile();
+        }
+    });
+    logTimer->start(2000);
+    mixxx::Logging::mirrorLogToDirectory(logDir);
+#endif
 }
 
 void CoreServices::initialize(QApplication* pApp) {
@@ -641,7 +655,8 @@ void CoreServices::initialize(QApplication* pApp) {
 
     bool musicDirAdded = false;
 
-    if (m_pTrackCollectionManager->internalCollection()->loadRootDirs().isEmpty()) {
+    if (m_pTrackCollectionManager->internalCollection()->loadRootDirs().isEmpty() &&
+            !m_cmdlineArgs.getMediaPathProvided()) {
 #if defined(Q_OS_IOS) || defined(Q_OS_WASM)
         // On the web and iOS, we are running in a sandbox (a virtual file
         // system on the web). Since we are generally limited to paths within
@@ -792,6 +807,38 @@ void CoreServices::initialize(QApplication* pApp) {
     }
 
     m_isInitialized = true;
+
+#ifdef MIXXX_OS_OHOS
+    const auto saveOhosSettings = [this, previous = QMap<ConfigKey, QString>()]() mutable {
+        if (!m_isInitialized) {
+            return;
+        }
+        ControlDoublePrivate::savePersistentValues();
+        const auto settings = m_pSettingsManager->settings();
+        QMap<ConfigKey, QString> values;
+        const auto groups = settings->getGroups();
+        for (const auto& group : groups) {
+            const auto keys = settings->getKeysWithGroup(group);
+            for (const auto& key : keys) {
+                values.insert(key, settings->getValueString(key));
+            }
+        }
+        if (values != previous && settings->save()) {
+            previous = std::move(values);
+            qInfo() << "OHOS settings saved" << previous.size();
+        }
+    };
+    auto* settingsTimer = new QTimer(this);
+    connect(settingsTimer, &QTimer::timeout, this, saveOhosSettings);
+    settingsTimer->start(2000);
+    connect(qApp, &QGuiApplication::applicationStateChanged, this,
+            [settingsTimer](Qt::ApplicationState state) {
+                if (state != Qt::ApplicationActive) {
+                    QMetaObject::invokeMethod(settingsTimer, "timeout", Qt::DirectConnection);
+                    mixxx::Logging::flushLogFile();
+                }
+            });
+#endif
 
     ControllerScriptEngineBase::registerPlayerManager(getPlayerManager());
 

@@ -31,8 +31,11 @@ class WTrackTableView : public WLibraryTableView {
             Library* pLibrary,
             double backgroundColorOpacity);
     ~WTrackTableView() override;
-#ifdef __LINUX__
+#if defined(__LINUX__) || defined(MIXXX_OS_OHOS)
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
+#endif
+#ifdef MIXXX_OS_OHOS
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
 #endif
     void contextMenuEvent(QContextMenuEvent * event) override;
     QString columnNameOfIndex(const QModelIndex& index) const;
@@ -164,6 +167,10 @@ class WTrackTableView : public WLibraryTableView {
     QString getModelStateKey() const override;
 
   private:
+#ifdef MIXXX_OS_OHOS
+    bool viewportEvent(QEvent* event) override;
+    bool m_touchDragPending = false;
+#endif
     void addToAutoDJ(PlaylistDAO::AutoDJSendLoc loc);
     void dragMoveEvent(QDragMoveEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;

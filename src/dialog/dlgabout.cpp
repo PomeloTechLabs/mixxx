@@ -3,6 +3,13 @@
 #include <QDebug>
 #include <QFile>
 #include <QLocale>
+#ifdef MIXXX_OS_OHOS
+#include <QFormLayout>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QTextEdit>
+#endif
 
 #include "defs_urls.h"
 #include "moc_dlgabout.cpp"
@@ -10,10 +17,49 @@
 #include "util/desktophelper.h"
 #include "util/versionstore.h"
 
-DlgAbout::DlgAbout()
+DlgAbout::DlgAbout([[maybe_unused]] UserSettingsPointer settings)
         : QDialog(nullptr),
           Ui::DlgAboutDlg() {
     setupUi(this);
+#ifdef MIXXX_OS_OHOS
+    auto* aboutContent = new QWidget(this);
+    aboutContent->setLayout(layout());
+    auto* aboutScroll = new QScrollArea(this);
+    aboutScroll->setFrameShape(QFrame::NoFrame);
+    aboutScroll->setWidgetResizable(true);
+    aboutScroll->setWidget(aboutContent);
+    auto* aboutLayout = new QVBoxLayout(this);
+    aboutLayout->setContentsMargins(0, 0, 0, 0);
+    aboutLayout->addWidget(aboutScroll);
+    setWindowTitle(QStringLiteral("关于旧柚Mixxx"));
+    setAttribute(Qt::WA_DeleteOnClose);
+    if (settings) {
+        auto* scroll = new QScrollArea(tabs);
+        scroll->setWidgetResizable(true);
+        auto* content = new QWidget(scroll);
+        auto* form = new QFormLayout(content);
+        auto* name = new QLineEdit(settings->getValueString(ConfigKey("[OHOSAbout]", "name")), content);
+        auto* description = new QTextEdit(settings->getValueString(ConfigKey("[OHOSAbout]", "description")), content);
+        auto* link = new QLineEdit(settings->getValueString(ConfigKey("[OHOSAbout]", "link")), content);
+        form->addRow(QStringLiteral("个人信息"), name);
+        form->addRow(QStringLiteral("简介"), description);
+        form->addRow(QStringLiteral("主页 / 联系方式"), link);
+        auto* save = new QPushButton(QStringLiteral("保存个人信息"), content);
+        save->setMinimumHeight(44);
+        form->addRow(save);
+        connect(save, &QPushButton::clicked, this, [settings, name, description, link, save] {
+            settings->set(ConfigKey("[OHOSAbout]", "name"), name->text());
+            settings->set(ConfigKey("[OHOSAbout]", "description"),
+                    description->toPlainText().replace(QLatin1Char('\n'), QLatin1Char(' ')));
+            settings->set(ConfigKey("[OHOSAbout]", "link"), link->text());
+            settings->save();
+            save->setText(QStringLiteral("已保存"));
+        });
+        scroll->setWidget(content);
+        tabs->insertTab(0, scroll, QStringLiteral("旧柚 / 个人信息"));
+        tabs->setCurrentIndex(0);
+    }
+#endif
     setWindowIcon(QIcon(MIXXX_ICON_PATH));
 
     mixxx_icon->load(QString(MIXXX_ICON_PATH));

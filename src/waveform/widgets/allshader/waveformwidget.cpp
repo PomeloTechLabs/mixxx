@@ -140,9 +140,11 @@ WaveformWidget::addWaveformSignalRenderer(WaveformWidgetType::Type type,
 }
 
 mixxx::Duration WaveformWidget::render() {
+#ifndef MIXXX_OS_OHOS
     makeCurrentIfNeeded();
     paintGL();
     doneCurrent();
+#endif
     // In the legacy widgets, this is used to "return timer for painter setup"
     // which is not relevant here. Also note that the return value is not used
     // at all, so it might be better to remove it everywhere. In the meantime.

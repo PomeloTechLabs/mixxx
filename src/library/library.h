@@ -184,6 +184,8 @@ class Library: public QObject {
       void onPlayerManagerTrackAnalyzerIdle();
 
   private:
+    void registerLauncherMediaDirectory(int remainingAttempts);
+
     const UserSettingsPointer m_pConfig;
 
     // The Mixxx database connection pool

@@ -1,5 +1,10 @@
 #include "mixxxmainwindow.h"
 
+#ifdef MIXXX_OS_OHOS
+#include "platform/ohos/windowadapter.h"
+#include "platform/ohos/mediacontroller.h"
+#endif
+
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QDebug>
@@ -94,6 +99,12 @@ MixxxMainWindow::MixxxMainWindow(std::shared_ptr<mixxx::CoreServices> pCoreServi
           m_pPrefDlg(nullptr),
           m_toolTipsCfg(mixxx::preferences::Tooltips::On) {
     DEBUG_ASSERT(pCoreServices);
+#ifdef MIXXX_OS_OHOS
+    setWindowFlag(Qt::FramelessWindowHint);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
+#endif
+#endif
     // These depend on the settings
 #ifdef __LINUX__
     // If the desktop features a global menubar and we'll go fullscreen during
@@ -393,10 +404,17 @@ void MixxxMainWindow::initialize() {
     // so it's now safe to write the new config to disk.
     m_pCoreServices->getSoundManager()->getConfig().writeToDisk();
 
+#ifdef MIXXX_OS_OHOS
+    m_pOhosWindow = new mixxx::ohos::WindowAdapter(this);
+    m_pOhosWindow->setSkin(m_pCentralWidget);
+    m_pOhosMedia = new mixxx::ohos::MediaController(
+            m_pCoreServices->getLibrary().get(), pPlayerManager.get(), this);
+#else
     // this has to be after the OpenGL widgets are created or depending on a
     // million different variables the first waveform may be horribly
     // corrupted. See bug 521509 -- bkgood ?? -- vrince
     setCentralWidget(m_pCentralWidget);
+#endif
 
 #ifndef __APPLE__
     // Ask for permission to auto-hide the menu bar if applicable.
@@ -457,6 +475,10 @@ void MixxxMainWindow::initialize() {
 }
 
 MixxxMainWindow::~MixxxMainWindow() {
+#ifdef MIXXX_OS_OHOS
+    delete m_pOhosMedia;
+    m_pOhosMedia = nullptr;
+#endif
     Timer t("~MixxxMainWindow");
     t.start();
 
@@ -1229,7 +1251,13 @@ void MixxxMainWindow::slotNoAuxiliaryInputConfigured() {
 }
 
 void MixxxMainWindow::slotHelpAbout() {
-    DlgAbout* about = new DlgAbout;
+    DlgAbout* about = new DlgAbout(m_pCoreServices->getSettings());
+#ifdef MIXXX_OS_OHOS
+    if (width() < 960 || height() < 540) {
+        about->showMaximized();
+        return;
+    }
+#endif
     about->show();
 }
 
@@ -1359,9 +1387,11 @@ void MixxxMainWindow::rebootMixxxView() {
     // window returns to 0,0 but and the backdrop disappears so it looks as if
     // it is not fullscreen, but acts as if it is.
     bool wasFullScreen = isFullScreen();
+#ifndef MIXXX_OS_OHOS
     if (wasFullScreen) {
         showMaximized();
     }
+#endif
 
     tryParseAndSetDefaultStyleSheet();
 
@@ -1375,8 +1405,12 @@ void MixxxMainWindow::rebootMixxxView() {
     }
     m_pMenuBar->setStyleSheet(m_pCentralWidget->styleSheet());
 
+#ifdef MIXXX_OS_OHOS
+    m_pOhosWindow->setSkin(m_pCentralWidget);
+#else
     setCentralWidget(m_pCentralWidget);
-#ifdef __LINUX__
+#endif
+#if defined(__LINUX__) || defined(MIXXX_OS_OHOS)
     // don't adjustSize() on Linux as this wouldn't use the entire available area
     // to paint the new skin with X11
     // https://github.com/mixxxdj/mixxx/issues/9309
@@ -1385,7 +1419,9 @@ void MixxxMainWindow::rebootMixxxView() {
 #endif
 
     if (wasFullScreen) {
+#ifndef MIXXX_OS_OHOS
         showFullScreen();
+#endif
     } else {
         // Programmatic placement at this point is very problematic.
         // The screen() method returns stale data (primary screen)
@@ -1399,6 +1435,19 @@ void MixxxMainWindow::rebootMixxxView() {
     }
 
     m_inRebootMixxxView = false;
+#ifdef MIXXX_OS_OHOS
+    QTimer::singleShot(0, this, [] {
+        auto* modal = QApplication::activeModalWidget();
+        if (modal && modal->isVisible()) {
+            modal->activateWindow();
+            auto* focus = QApplication::focusWidget();
+            if (!focus || focus->window() != modal) {
+                modal->setFocus(Qt::OtherFocusReason);
+            }
+            QGuiApplication::inputMethod()->hide();
+        }
+    });
+#endif
     qDebug() << "rebootMixxxView DONE";
 }
 

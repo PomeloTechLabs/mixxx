@@ -18,7 +18,8 @@
         "name": "QAbility",
         "srcEntry": "./ets/qability/QAbility.ets",
         "launchType": "specified",
-        "orientation": "auto_rotation",
+        "orientation": "auto_rotation_landscape",
+        "backgroundModes": ["audioPlayback"],
         "description": "$string:QAbility_desc",
         "icon": "$media:layered_image",
         "label": "$string:QAbility_label",
@@ -63,6 +64,8 @@
         "continuable": true
       }
     ],
-    "requestPermissions": [/* %%INSERT_PERMISSIONS%% */]
+    "requestPermissions": [
+      {"name": "ohos.permission.KEEP_BACKGROUND_RUNNING"}
+    ]
   }
 }

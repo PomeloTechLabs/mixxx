@@ -40,6 +40,7 @@ class ControlDoublePrivate : public QObject {
     // "persist in user config" get and set their value on creation/deletion
     // using this UserSettings.
     static void setUserConfig(const UserSettingsPointer& pConfig);
+    static void savePersistentValues();
 
     // Adds a ConfigKey for 'alias' to the control for 'key'. Can be used for
     // supporting a legacy / deprecated control. The 'key' control must exist

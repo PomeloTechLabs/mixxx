@@ -18,6 +18,9 @@ class allshader::WaveformRenderBackground final
 
     void setup(const QDomNode& node, const SkinContext& skinContext) override;
     void paintGL() override;
+#ifdef MIXXX_OS_OHOS
+    void preprocess() override;
+#endif
 
   private:
     QColor m_backgroundColor;

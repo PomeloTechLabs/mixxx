@@ -14,6 +14,7 @@
 #include "library/trackcollectionmanager.h"
 #include "library/treeitem.h"
 #include "moc_browsefeature.cpp"
+#include "util/cmdlineargs.h"
 #include "widget/wlibrary.h"
 #include "widget/wlibrarysidebar.h"
 #include "widget/wlibrarytextbrowser.h"
@@ -547,6 +548,13 @@ void BrowseFeature::loadQuickLinks() {
             m_quickLinkList = quickLinks.split(kQuickLinksSeparator);
         }
     }
+    if (CmdlineArgs::Instance().getMediaPathProvided()) {
+        const QString mediaPath = QDir(CmdlineArgs::Instance().getMediaPath()).absolutePath() +
+                QStringLiteral("/");
+        if (!m_quickLinkList.contains(mediaPath)) {
+            m_quickLinkList.append(mediaPath);
+        }
+    }
 }
 
 QString BrowseFeature::extractNameFromPath(const QString& spath) {
@@ -555,8 +563,10 @@ QString BrowseFeature::extractNameFromPath(const QString& spath) {
 
 QStringList BrowseFeature::getDefaultQuickLinks() const {
     // Default configuration
-    QDir osMusicDir(QStandardPaths::writableLocation(
-            QStandardPaths::MusicLocation));
+    // --media-path wins over the OS location: on HarmonyOS the app-owned
+    // directory is the only one the app may access, and the OS music location
+    // is not implemented there at all.
+    QDir osMusicDir(CmdlineArgs::Instance().getMediaPath());
     QDir osDocumentsDir(QStandardPaths::writableLocation(
             QStandardPaths::DocumentsLocation));
     QDir osHomeDir(QStandardPaths::writableLocation(

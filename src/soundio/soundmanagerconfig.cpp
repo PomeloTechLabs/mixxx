@@ -553,6 +553,20 @@ void SoundManagerConfig::loadDefaults(SoundManager* soundManager, unsigned int f
 #elif defined(Q_OS_MACOS)
             m_api = SoundManagerConfig::kAPICoreAudio;
 #endif
+#ifdef MIXXX_OS_OHOS
+            // HarmonyOS exposes the OHAudio host API only. Without a selected
+            // API no output device is found, the sound configuration stays
+            // empty and Mixxx blocks on the "no output devices" dialog before
+            // the UI - menu bar included - has been built. Pick the first host
+            // API that actually has outputs instead of naming one, so this
+            // keeps working if the backend is renamed.
+            for (const QString& api : apiList) {
+                if (!soundManager->getDeviceList(api, true, false).isEmpty()) {
+                    m_api = api;
+                    break;
+                }
+            }
+#endif
         }
     }
 

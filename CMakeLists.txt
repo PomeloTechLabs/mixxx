@@ -2566,6 +2566,16 @@ endif()
 set_target_properties(mixxx-lib PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY}")
 target_link_libraries(mixxx PRIVATE mixxx-lib mixxx-gitinfostore)
 
+if(OHOS)
+  add_library(mixxxohosmedia SHARED src/platform/ohos/mediabridge.cpp)
+  set_target_properties(mixxxohosmedia PROPERTIES AUTOMOC OFF)
+  target_link_libraries(mixxxohosmedia PRIVATE Qt6::Core ace_napi.z)
+  target_sources(mixxx-lib PRIVATE
+    src/platform/ohos/mediacontroller.cpp
+    src/platform/ohos/windowadapter.cpp)
+  target_link_libraries(mixxx-lib PRIVATE mixxxohosmedia Qt6::GuiPrivate)
+endif()
+
 #
 # Installation and Packaging
 #
@@ -3840,6 +3850,9 @@ else()
     )
     target_link_libraries(mixxx-lib PRIVATE "${GLESv3_LIBRARY}")
     target_compile_definitions(mixxx-lib PUBLIC QT_OPENGL_ES_2)
+    # PortAudio's OHAudio host API (pa_ohos) speaks to the system audio stack
+    # and to hilog; those symbols live in the NDK sysroot.
+    target_link_libraries(mixxx-lib PRIVATE ohaudio hilog_ndk.z)
   else()
     find_package(WrapOpenGL REQUIRED)
     if(OPENGL_opengl_LIBRARY)

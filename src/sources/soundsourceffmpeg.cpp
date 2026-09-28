@@ -1048,6 +1048,13 @@ bool SoundSourceFFmpeg::adjustCurrentPosition(SINT startIndex) {
             m_pavStream->index,
             seekTimestamp,
             AVSEEK_FLAG_BACKWARD);
+    if (av_seek_frame_result < 0 && seekIndex < 0) {
+        av_seek_frame_result = av_seek_frame(
+                m_pavInputFormatContext,
+                m_pavStream->index,
+                seekTimestamp,
+                0);
+    }
     if (av_seek_frame_result < 0) {
         // Unrecoverable seek error: Invalidate the current position and abort
         kLogger.warning().noquote()

@@ -49,6 +49,7 @@ class Logging {
     static void shutdown();
 
     static void flushLogFile();
+    static bool mirrorLogToDirectory(const QString& logDirPath);
 
     static bool shouldFlush(
             LogLevel logFlushLevel) {

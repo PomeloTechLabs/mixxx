@@ -86,7 +86,11 @@ void WGLWidget::resizeGL(int w, int h) {
 
 void WGLWidget::swapBuffers() {
     if (shouldRender()) {
+#ifdef MIXXX_OS_OHOS
+        m_pOpenGLWindow->update();
+#else
         m_pOpenGLWindow->context()->swapBuffers(m_pOpenGLWindow->context()->surface());
+#endif
     }
 }
 

@@ -9,6 +9,7 @@
 #include "encoder/encodermp3settings.h"
 #include "moc_dlgprefrecord.cpp"
 #include "recording/defs_recording.h"
+#include "util/cmdlineargs.h"
 #include "util/sandbox.h"
 
 namespace {
@@ -29,12 +30,19 @@ DlgPrefRecord::DlgPrefRecord(QWidget* parent, UserSettingsPointer pConfig)
     loadChannelMode();
 
     // Setting recordings path.
+    // A launcher-provided media path is the only writable location on
+    // platforms that cannot grant access to a user-chosen folder, so a folder
+    // configured outside of it is unusable and gets re-pointed here.
+    const QString mediaPath = CmdlineArgs::Instance().getMediaPath();
     QString recordingsPath = m_pConfig->getValueString(ConfigKey(RECORDING_PREF_KEY, "Directory"));
+    if (CmdlineArgs::Instance().getMediaPathProvided() &&
+            !recordingsPath.startsWith(mediaPath)) {
+        recordingsPath.clear();
+    }
     if (recordingsPath.isEmpty()) {
         // Initialize recordings path in config to old default path.
         // Do it here so we show current value in UI correctly.
-        QString musicDir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
-        QDir recordDir(musicDir + "/Mixxx/Recordings");
+        QDir recordDir(mediaPath + "/Mixxx/Recordings");
         recordingsPath = recordDir.absolutePath();
         m_pConfig->setValue(ConfigKey(RECORDING_PREF_KEY, "Directory"), recordingsPath);
     }

@@ -77,7 +77,11 @@ QDateTime VersionStore::date() {
 
 // static
 QString VersionStore::applicationName() {
+#ifdef MIXXX_OS_OHOS
+    return QStringLiteral("旧柚Mixxx");
+#else
     return kMixxx;
+#endif
 }
 
 // MSVC doesn't properly evaluate #if in macro arguments (such as QStringLiteral)

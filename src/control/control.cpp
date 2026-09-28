@@ -100,6 +100,19 @@ void ControlDoublePrivate::setUserConfig(const UserSettingsPointer& pConfig) {
     s_pUserConfig = pConfig;
 }
 
+void ControlDoublePrivate::savePersistentValues() {
+    const auto config = s_pUserConfig;
+    if (!config) {
+        return;
+    }
+    const auto controls = getAllInstances();
+    for (const auto& control : controls) {
+        if (control->m_bPersistInConfiguration) {
+            config->set(control->m_key, QString::number(control->get()));
+        }
+    }
+}
+
 // static
 void ControlDoublePrivate::insertAlias(const ConfigKey& alias, const ConfigKey& key) {
     MMutexLocker locker(&s_qCOHashMutex);
@@ -220,13 +233,14 @@ QList<QSharedPointer<ControlDoublePrivate>> ControlDoublePrivate::getAllInstance
     QList<QSharedPointer<ControlDoublePrivate>> result;
     MMutexLocker locker(&s_qCOHashMutex);
     result.reserve(s_qCOHash.size());
-    for (auto it = s_qCOHash.constBegin(); it != s_qCOHash.constEnd(); ++it) {
+    for (auto it = s_qCOHash.begin(); it != s_qCOHash.end();) {
         auto pControl = it.value().lock();
         if (pControl) {
             result.append(std::move(pControl));
+            ++it;
         } else {
             // The weak pointer has become invalid and can be cleaned up
-            s_qCOHash.erase(it);
+            it = s_qCOHash.erase(it);
         }
     }
     return result;

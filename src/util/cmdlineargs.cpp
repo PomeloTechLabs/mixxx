@@ -104,6 +104,15 @@ CmdlineArgs::CmdlineArgs()
 {
 }
 
+QString CmdlineArgs::getMediaPath() const {
+    if (!m_mediaPath.isEmpty()) {
+        return m_mediaPath;
+    }
+    // HarmonyOS has no music location of its own, so the launcher always
+    // supplies one via --media-path there.
+    return QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
+}
+
 namespace {
 bool parseLogLevel(
         const QString& logLevel,
@@ -228,6 +237,17 @@ bool CmdlineArgs::parse(const QStringList& arguments, CmdlineArgs::ParseMode mod
     resourcePathDeprecated.setValueName(resourcePath.valueName());
     parser.addOption(resourcePath);
     parser.addOption(resourcePathDeprecated);
+
+    // HarmonyOS grants an app access only to its own app-scoped directory, so
+    // the launcher passes the music folder explicitly instead of letting the
+    // user pick one through a folder picker that could not grant access.
+    const QCommandLineOption mediaPath(QStringLiteral("media-path"),
+            forUserFeedback ? QCoreApplication::translate("CmdlineArgs",
+                                      "Directory Mixxx should use as the user's music folder, "
+                                      "overriding the operating system default location.")
+                            : QString(),
+            QStringLiteral("path"));
+    parser.addOption(mediaPath);
 
     const QCommandLineOption timelinePath(QStringLiteral("timeline-path"),
             forUserFeedback ? QCoreApplication::translate("CmdlineArgs",
@@ -463,6 +483,10 @@ bool CmdlineArgs::parse(const QStringList& arguments, CmdlineArgs::ParseMode mod
         m_resourcePath = parser.value(resourcePath);
     } else if (parser.isSet(resourcePathDeprecated)) {
         m_resourcePath = parser.value(resourcePathDeprecated);
+    }
+
+    if (parser.isSet(mediaPath)) {
+        setMediaPath(parser.value(mediaPath));
     }
 
     if (parser.isSet(timelinePath)) {

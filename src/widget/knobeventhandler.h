@@ -20,9 +20,11 @@ class KnobEventHandler {
     KnobEventHandler()
             : m_bRightButtonPressed(false),
               m_pWheelCursorTimer(nullptr) {
+#ifndef MIXXX_OS_OHOS
         QPixmap blankPixmap(32, 32);
         blankPixmap.fill(Qt::transparent);
         m_blankCursor = QCursor(blankPixmap);
+#endif
     }
 
     double valueFromMouseEvent(T* pWidget, QMouseEvent* e) {
@@ -76,7 +78,9 @@ class KnobEventHandler {
                 m_prevPos = m_startPos;
                 // Somehow using Qt::BlankCursor does not work on Windows
                 // https://mixxx.org/forums/viewtopic.php?p=40298#p40298
+#ifndef MIXXX_OS_OHOS
                 pWidget->setCursor(m_blankCursor);
+#endif
                 break;
             default:
                 break;
@@ -94,8 +98,10 @@ class KnobEventHandler {
         switch (e->button()) {
             case Qt::LeftButton:
             case Qt::MiddleButton:
+#ifndef MIXXX_OS_OHOS
                 QCursor::setPos(m_startPos);
                 pWidget->unsetCursor();
+#endif
                 value = valueFromMouseEvent(pWidget, e);
                 pWidget->setControlParameterUp(value);
                 pWidget->inputActivity();
@@ -111,7 +117,9 @@ class KnobEventHandler {
     void wheelEvent(T* pWidget, QWheelEvent* e) {
         // Hide/blank the cursor so the parameter value below the knob is not obscured.
         // Restore the cursor when the timer runs out, or when the cursor leaves the widget.
+#ifndef MIXXX_OS_OHOS
         pWidget->setCursor(m_blankCursor);
+#endif
         // For legacy (MIDI) reasons this is tuned to 127.
         double wheelDirection = e->angleDelta().y() / (120.0 * 127.0);
         double newValue = pWidget->getControlParameter() + wheelDirection;
@@ -122,6 +130,7 @@ class KnobEventHandler {
         pWidget->setControlParameter(newValue);
         pWidget->inputActivity();
         e->accept();
+#ifndef MIXXX_OS_OHOS
         if (!m_pWheelCursorTimer) {
             m_pWheelCursorTimer = new QTimer(pWidget);
             m_pWheelCursorTimer->setSingleShot(true);
@@ -134,6 +143,7 @@ class KnobEventHandler {
                         pWidget->unsetCursor();
                     }
                 });
+#endif
     }
 
     void leaveEvent(T* pWidget, QEvent* e) {
