@@ -46,6 +46,17 @@ P1.14 收尾另抓到**空碟机背景**黑/灰切换（有歌曲的波形/CUE �
 
 ## 2. 环境与路径（务必先固化）
 
+### 2.0 Git 仓库与上游联动（2026-09-28 起）
+
+| 项 | 值 |
+|---|---|
+| 本仓库远程 `origin` | `https://github.com/PomeloTechLabs/mixxx`（**fork**，`forked from mixxxdj/mixxx`） |
+| 上游远程 `upstream` | `https://github.com/mixxxdj/mixxx`（原 origin，partial clone `blob:none`） |
+| 工作分支 | `feature/ohos-port`（已推送到 origin；fork 的 `main` 保持跟踪上游，**不要**用本地旧基线覆盖它） |
+| 未来同步上游 | `git fetch upstream` 后将 `upstream/main` rebase/merge 进 `feature/ohos-port`；或用 GitHub 页面的 *Sync fork* |
+| 推送注意 | 网络走代理 `127.0.0.1:8080`（repo 的 `http.proxy` 已配置；gh CLI 需 `HTTPS_PROXY` 环境变量） |
+| 敏感文件 | `sign/`（签名私钥）与 `packaging/ohos/.idea/` 已写入 `.git/info/exclude`，**永不入库**；`resfile/` 生成物已 untrack 并进 `.gitignore`（构建时 `build-hap.sh` 重新生成） |
+
 | 项 | 值 |
 |---|---|
 | 仓库 | `D:\Git\mixxx`（独立 git repo，分支 `feature/ohos-port`，基线 `bcfb7956`） |
