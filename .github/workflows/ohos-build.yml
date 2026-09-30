@@ -117,6 +117,22 @@ jobs:
       # CI builds unsigned: an empty signingConfigs profile makes hvigor
       # skip SignHap. The repo's own profile points at a developer machine's
       # debug material and would fail here. Restored after packaging.
+      # The buildenv base image predates some host-tool runtime libs the
+      # local build container got via ad-hoc apt installs (qsb from
+      # qt-host needs libEGL). Keep in sync with the Dockerfile apt set.
+      - name: Ensure host-tool runtime libraries
+        run: |
+          set -euxo pipefail
+          packages=()
+          for p in libegl1 libgl1 libopengl0 libxkbcommon0 libfontconfig1 libglib2.0-0; do
+            dpkg -s "$p" >/dev/null 2>&1 || packages+=("$p")
+          done
+          if [ "${#packages[@]}" -gt 0 ]; then
+            apt-get update -qq
+            apt-get install -y --no-install-recommends "${packages[@]}"
+          fi
+          /data/out/qt-host/bin/qsb --version
+
       - name: Provision unsigned build-profile.json5
         working-directory: packaging/ohos
         run: |
