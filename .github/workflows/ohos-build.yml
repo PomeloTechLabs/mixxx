@@ -96,16 +96,21 @@ jobs:
 
       # The vcpkg arm64-ohos protobuf config needs a HOST protoc; the image
       # carries only the target installed tree, so fetch the exact x64-linux
-      # build (vcpkg 33.4.0) from the buildenv-assets prerelease.
+      # build (vcpkg 33.4.0) from the buildenv-assets prerelease. The gh CLI
+      # is not installed inside the container; use the REST API.
       - name: Provision host protoc
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
+          asset_id="$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/buildenv-assets-1" \
+            | python3 -c "import json,sys; a=[x for x in json.load(sys.stdin)['assets'] if x['name'].startswith('protoc-')]; print(a[0]['id'])")"
           mkdir -p /tmp/protoc-dl
-          gh release download buildenv-assets-1 --repo "$GITHUB_REPOSITORY" \
-            --pattern 'protoc-*' --dir /tmp/protoc-dl
-          install -Dm755 /tmp/protoc-dl/protoc-* \
+          curl -sfL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$asset_id" \
+            -o /tmp/protoc-dl/protoc
+          install -Dm755 /tmp/protoc-dl/protoc \
             /data/vcpkg/vcpkg/packages/protobuf_x64-linux/tools/protobuf/protoc
           /data/vcpkg/vcpkg/packages/protobuf_x64-linux/tools/protobuf/protoc --version
 
@@ -188,7 +193,7 @@ jobs:
       - name: Restore repo build profile
         if: always()
         working-directory: packaging/ohos
-        run: mv -f build-profile.json5.repo build-profile.json5
+        run: mv -f build-profile.json5.repo build-profile.json5 || true
 
       - name: Verify and locate HAP
         id: art
