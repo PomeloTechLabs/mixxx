@@ -3,8 +3,8 @@
     "bundleName": "com.pomelo.mixxx",
     "configuration": "$profile:configuration",
     "vendor": "Mixxx",
-    "versionCode": 1000000,
-    "versionName": "1.0.0",
+    "versionCode": 207009005,
+    "versionName": "2.7.0.5",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }

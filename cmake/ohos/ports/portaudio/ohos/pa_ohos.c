@@ -59,6 +59,13 @@ typedef struct PaOhosStream
     OH_AudioStreamBuilder* builder;
     OH_AudioRenderer* renderer;
 
+    /* End-to-end renderer latency reported by OHAudio (or estimated from
+     * the host buffer size). Reported via PaStreamInfo only: feeding it
+     * into outputBufferDacTime makes the DAC estimate jitter with the
+     * callback scheduling, which Mixxx's timestamp plausibility check
+     * flip-flops on and the waveform jitters back and forth. */
+    double rendererLatencySecs;
+
     volatile sig_atomic_t isActive;
     volatile sig_atomic_t isStopped;
     volatile sig_atomic_t aborting;
@@ -148,7 +155,13 @@ static int32_t ohosRendererOnWriteData(
     PaStreamCallbackTimeInfo timeInfo;
     timeInfo.currentTime = PaUtil_GetTime();
     timeInfo.inputBufferAdcTime = 0.0;
-    timeInfo.outputBufferDacTime = stream->startTime + (double)stream->framesPlayed / stream->sampleRate;
+    /* Advance the DAC estimate by exactly the frames delivered so it is
+     * self-consistent with Mixxx's buffer timing: Mixxx's waveform clock
+     * rejects timestamps that do not advance one buffer per callback and
+     * falls back to CPU timing, and wall-clock jitter here made it flip
+     * between both clocks (waveform jerking back and forth). */
+    timeInfo.outputBufferDacTime =
+            stream->startTime + (double)stream->framesPlayed / stream->sampleRate;
 
     int callbackResult = paContinue;
     PaUtil_BeginBufferProcessing(&stream->bufferProcessor, &timeInfo, 0);
@@ -481,31 +494,49 @@ static PaError OpenStream(PaUtilHostApiRepresentation* hostApi, PaStream** s,
             Pa_GetSampleSize(stream->hostOutputSampleFormat) * stream->outputChannelCount;
     resetStreamState(stream);
 
-    /* Create the OHAudio renderer. */
-    OH_AudioStream_Result audioResult =
-            OH_AudioStreamBuilder_Create(&stream->builder, AUDIOSTREAM_TYPE_RENDERER);
-    if (audioResult != AUDIOSTREAM_SUCCESS || !stream->builder) {
-        PA_OHOS_LOG("OH_AudioStreamBuilder_Create failed: %d", (int)audioResult);
-        result = paUnanticipatedHostError;
-        goto error;
+    /* Create the OHAudio renderer. Prefer the FAST (low-latency) pipeline;
+     * NORMAL buffers tens of milliseconds more in the audio server. Some
+     * devices reject FAST for certain rates or channel counts, so retry
+     * with NORMAL instead of failing to open the stream. */
+    static const OH_AudioStream_LatencyMode kLatencyModes[] = {
+            AUDIOSTREAM_LATENCY_MODE_FAST,
+            AUDIOSTREAM_LATENCY_MODE_NORMAL,
+    };
+    OH_AudioStream_Result audioResult = AUDIOSTREAM_ERROR_INVALID_PARAM;
+    size_t latencyMode = 0;
+    for (latencyMode = 0;
+            latencyMode < sizeof(kLatencyModes) / sizeof(kLatencyModes[0]);
+            latencyMode++) {
+        audioResult = OH_AudioStreamBuilder_Create(&stream->builder, AUDIOSTREAM_TYPE_RENDERER);
+        if (audioResult != AUDIOSTREAM_SUCCESS || !stream->builder) {
+            PA_OHOS_LOG("OH_AudioStreamBuilder_Create failed: %d", (int)audioResult);
+            result = paUnanticipatedHostError;
+            goto error;
+        }
+
+        OH_AudioStreamBuilder_SetRendererInfo(stream->builder, AUDIOSTREAM_USAGE_MUSIC);
+        OH_AudioStreamBuilder_SetSamplingRate(stream->builder, (int32_t)sampleRate);
+        OH_AudioStreamBuilder_SetChannelCount(stream->builder, outputParameters->channelCount);
+        OH_AudioStreamBuilder_SetSampleFormat(stream->builder, AUDIOSTREAM_SAMPLE_F32LE);
+        OH_AudioStreamBuilder_SetLatencyMode(stream->builder, kLatencyModes[latencyMode]);
+
+        OH_AudioRenderer_Callbacks callbacks;
+        callbacks.OH_AudioRenderer_OnWriteData = ohosRendererOnWriteData;
+        callbacks.OH_AudioRenderer_OnStreamEvent = ohosRendererOnStreamEvent;
+        callbacks.OH_AudioRenderer_OnInterruptEvent = ohosRendererOnInterruptEvent;
+        callbacks.OH_AudioRenderer_OnError = ohosRendererOnError;
+        OH_AudioStreamBuilder_SetRendererCallback(stream->builder, callbacks, stream);
+
+        audioResult = OH_AudioStreamBuilder_GenerateRenderer(stream->builder, &stream->renderer);
+        if (audioResult == AUDIOSTREAM_SUCCESS && stream->renderer) {
+            break;
+        }
+        PA_OHOS_LOG("GenerateRenderer failed in latency mode %d: %d",
+                (int)kLatencyModes[latencyMode], (int)audioResult);
+        OH_AudioStreamBuilder_Destroy(stream->builder);
+        stream->builder = NULL;
     }
-
-    OH_AudioStreamBuilder_SetRendererInfo(stream->builder, AUDIOSTREAM_USAGE_MUSIC);
-    OH_AudioStreamBuilder_SetSamplingRate(stream->builder, (int32_t)sampleRate);
-    OH_AudioStreamBuilder_SetChannelCount(stream->builder, outputParameters->channelCount);
-    OH_AudioStreamBuilder_SetSampleFormat(stream->builder, AUDIOSTREAM_SAMPLE_F32LE);
-    OH_AudioStreamBuilder_SetLatencyMode(stream->builder, AUDIOSTREAM_LATENCY_MODE_NORMAL);
-
-    OH_AudioRenderer_Callbacks callbacks;
-    callbacks.OH_AudioRenderer_OnWriteData = ohosRendererOnWriteData;
-    callbacks.OH_AudioRenderer_OnStreamEvent = ohosRendererOnStreamEvent;
-    callbacks.OH_AudioRenderer_OnInterruptEvent = ohosRendererOnInterruptEvent;
-    callbacks.OH_AudioRenderer_OnError = ohosRendererOnError;
-    OH_AudioStreamBuilder_SetRendererCallback(stream->builder, callbacks, stream);
-
-    audioResult = OH_AudioStreamBuilder_GenerateRenderer(stream->builder, &stream->renderer);
     if (audioResult != AUDIOSTREAM_SUCCESS || !stream->renderer) {
-        PA_OHOS_LOG("OH_AudioStreamBuilder_GenerateRenderer failed: %d", (int)audioResult);
         result = paUnanticipatedHostError;
         goto error;
     }
@@ -541,14 +572,17 @@ static PaError OpenStream(PaUtilHostApiRepresentation* hostApi, PaStream** s,
             latencyMs > 0) {
         rendererLatency = latencyMs / 1000.0;
     }
+    stream->rendererLatencySecs = rendererLatency;
     stream->streamRepresentation.streamInfo.structVersion = 1;
     stream->streamRepresentation.streamInfo.sampleRate = stream->sampleRate;
     stream->streamRepresentation.streamInfo.outputLatency = rendererLatency +
             PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor) /
                     stream->sampleRate;
 
-    PA_OHOS_LOG("stream opened: %{public}d Hz, %{public}d ch, %{public}lu frames/host buffer",
-            rendererRate, outputParameters->channelCount, stream->framesPerHostBuffer);
+    PA_OHOS_LOG("stream opened: %{public}d Hz, %{public}d ch, %{public}lu frames/host buffer, "
+                "latency mode %{public}d, renderer latency %{public}d ms",
+            rendererRate, outputParameters->channelCount, stream->framesPerHostBuffer,
+            (int)kLatencyModes[latencyMode], (int)latencyMs);
 
     *s = (PaStream*)stream;
     return result;
