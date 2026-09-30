@@ -138,6 +138,9 @@ jobs:
       - name: Configure and build libmixxx (Ninja, Release)
         run: |
           set -euxo pipefail
+          # FFmpeg/dependency versions are resolved via pkg-config against
+          # the vcpkg installed tree (matches the local build container).
+          export PKG_CONFIG_PATH=/data/vcpkg/vcpkg/installed/arm64-ohos/usr/lib/pkgconfig
           cmake -S . -B /data/mixxx-build/ohos -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$OHOS_SDK_ROOT/native/build/cmake/ohos.toolchain.cmake" \
