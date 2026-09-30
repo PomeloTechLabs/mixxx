@@ -1,10 +1,36 @@
 #include "widget/wwidget.h"
 
 #include <QTouchEvent>
+#ifdef MIXXX_OS_OHOS
+#include <QApplication>
+#include <QDrag>
+#include <QWindow>
+#include "platform/ohos/touchcompat.h"
+#endif
 
 #include "control/controlproxy.h"
 #include "moc_wwidget.cpp"
 #include "util/assert.h"
+
+#ifdef MIXXX_OS_OHOS
+namespace {
+class OhosTouchMouseEvent final : public QMouseEvent {
+  public:
+    OhosTouchMouseEvent(QEvent::Type type, const QPointF& position,
+            const QPointF& global, Qt::MouseButton button, Qt::MouseButtons buttons,
+            const QTouchEvent& touch)
+            : QMouseEvent(type, position, position, global, button, buttons,
+                      touch.modifiers(), Qt::MouseEventSynthesizedByApplication,
+                      mixxx::ohos::touchConversionMouseDevice()) {
+        m_dev = touch.pointingDevice();
+        if (!touch.points().isEmpty()) {
+            m_points = {touch.points().first()};
+        }
+        m_timeStamp = touch.timestamp();
+    }
+};
+}
+#endif
 
 WWidget::WWidget(QWidget* parent, Qt::WindowFlags flags)
         : QWidget(parent, flags),
@@ -59,6 +85,9 @@ bool WWidget::event(QEvent* e) {
         case QEvent::TouchBegin:
         case QEvent::TouchUpdate:
         case QEvent::TouchEnd:
+#ifdef MIXXX_OS_OHOS
+        case QEvent::TouchCancel:
+#endif
         {
             QTouchEvent* touchEvent = dynamic_cast<QTouchEvent*>(e);
             if (touchEvent == nullptr
@@ -86,6 +115,9 @@ bool WWidget::event(QEvent* e) {
                 eventType = QEvent::MouseMove;
                 break;
             case QEvent::TouchEnd:
+#ifdef MIXXX_OS_OHOS
+            case QEvent::TouchCancel:
+#endif
                 eventType = QEvent::MouseButtonRelease;
                 break;
             default:
@@ -93,6 +125,74 @@ bool WWidget::event(QEvent* e) {
                 break;
             }
 
+#ifdef MIXXX_OS_OHOS
+            if (e->type() == QEvent::TouchCancel && inherits("WHotcueButton")) {
+                setProperty("ohosTouchEditMoved", true);
+                setProperty("ohosTouchEditing", false);
+            }
+            if (e->type() == QEvent::TouchCancel &&
+                    qApp->property("ohosTouchWidgetDrag").toBool()) {
+                QDrag::cancel();
+                setProperty("ohosTouchEditing", false);
+                m_activeTouchButton = Qt::NoButton;
+                touchEvent->accept();
+                return true;
+            }
+            if (touchEvent->points().isEmpty() && e->type() != QEvent::TouchCancel) {
+                break;
+            }
+            const auto position = touchEvent->points().isEmpty()
+                    ? property("ohosLastTouchPosition").toPointF()
+                    : touchEvent->points().first().position();
+            const auto global = touchEvent->points().isEmpty()
+                    ? mapToGlobal(position)
+                    : touchEvent->points().first().globalPosition();
+            setProperty("ohosLastTouchPosition", position);
+            const bool resettable = inherits("WKnob") || inherits("WKnobComposed") ||
+                    inherits("WSliderComposed");
+            if (resettable && eventType == QEvent::MouseButtonPress && m_activeTouchButton == Qt::LeftButton) {
+                const auto previous = property("ohosTouchTapTimestamp").toULongLong();
+                if (previous > 0 && touchEvent->timestamp() >= previous &&
+                        touchEvent->timestamp() - previous <= quint64(QApplication::doubleClickInterval()) &&
+                        (global - property("ohosTouchTapPosition").toPointF()).manhattanLength() <= QApplication::startDragDistance()) {
+                    eventType = QEvent::MouseButtonDblClick;
+                }
+                setProperty("ohosTouchTapTimestamp", qulonglong(0));
+            } else if (resettable && e->type() == QEvent::TouchEnd && !touchEvent->points().isEmpty()) {
+                const auto& point = touchEvent->points().first();
+                if (touchEvent->timestamp() - point.pressTimestamp() <= quint64(QApplication::doubleClickInterval()) &&
+                        (point.globalPosition() - point.globalPressPosition()).manhattanLength() <= QApplication::startDragDistance()) {
+                    setProperty("ohosTouchTapTimestamp", qulonglong(touchEvent->timestamp()));
+                    setProperty("ohosTouchTapPosition", global);
+                }
+            } else if (resettable && e->type() == QEvent::TouchCancel) {
+                setProperty("ohosTouchTapTimestamp", qulonglong(0));
+            }
+            const bool released = eventType == QEvent::MouseButtonRelease;
+            OhosTouchMouseEvent mouseEvent(eventType, position, global,
+                    eventType == QEvent::MouseMove ? Qt::NoButton : m_activeTouchButton,
+                    released ? Qt::NoButton : m_activeTouchButton,
+                    *touchEvent);
+            if (eventType != QEvent::MouseMove && inherits("WHotcueButton")) {
+                qInfo() << "OHOS hotcue touch" << eventType << touchEvent->pointingDevice()->type()
+                        << qApp->property("ohosTouchHotcueEdit").toBool();
+            }
+            if (qApp->property("ohosTouchWidgetDrag").toBool() && window()->windowHandle()) {
+                if (released) {
+                    OhosTouchMouseEvent finalMove(QEvent::MouseMove, position, global,
+                            Qt::NoButton, m_activeTouchButton, *touchEvent);
+                    QCoreApplication::sendEvent(window()->windowHandle(), &finalMove);
+                }
+                QCoreApplication::sendEvent(window()->windowHandle(), &mouseEvent);
+            } else {
+                QWidget::event(&mouseEvent);
+            }
+            if (released) {
+                m_activeTouchButton = Qt::NoButton;
+            }
+            touchEvent->setAccepted(true);
+            return true;
+#else
             const QTouchEvent::TouchPoint& touchPoint =
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
                     touchEvent->points()
@@ -116,6 +216,7 @@ bool WWidget::event(QEvent* e) {
                     Qt::MouseEventSynthesizedByApplication);
 
             return QWidget::event(&mouseEvent);
+#endif
         }
         default:
             break;

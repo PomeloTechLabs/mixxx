@@ -6,6 +6,9 @@
 #include <QPoint>
 #include <QTimer>
 #include <QWheelEvent>
+#ifdef MIXXX_OS_OHOS
+#include <QApplication>
+#endif
 
 #include "util/math.h"
 
@@ -35,6 +38,12 @@ class KnobEventHandler {
 #endif
         QPoint diff = cur - m_prevPos;
         m_prevPos = cur;
+#ifdef MIXXX_OS_OHOS
+        if (e->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen) {
+            const double speed = math_clamp(qApp->property("ohosTouchKnobSensitivity").toDouble(), 0.1, 2.0);
+            return math_clamp(pWidget->getControlParameter() - diff.y() * speed / 127.0, 0.0, 1.0);
+        }
+#endif
         double dist = sqrt(static_cast<double>(diff.x() * diff.x() + diff.y() * diff.y()));
         bool y_dominant = abs(diff.y()) > abs(diff.x());
 

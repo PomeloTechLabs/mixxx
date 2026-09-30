@@ -265,7 +265,7 @@ HarmonyOS NEXT 要求 **p12 私钥 / .cer 应用证书 / profile 内嵌证书 �
 
 | 材料 | 证书指纹(SHA256) | 公钥(SHA256) |
 |---|---|---|
-| `sign/app_debug.p12`（alias `ad`，密码 Yifengling0） | E19822D2… | 14d310f4… |
+| `sign/app_debug.p12`（alias `ad`，密码 [REDACTED]） | E19822D2… | 14d310f4… |
 | `sign/ad.csr` | — | 14d310f4…（与 p12 一致 ✓） |
 | `sign/app_debug.cer` | df21a3c0…（= .ohos/default_g9 证书） | — |
 | `sign/mixxx_调试Debug.p7b` 内嵌证书 | 93BB5311… | **5f900b73…（无对应私钥）** |
@@ -630,6 +630,8 @@ node 'C:/Program Files/Huawei/DevEco Studio/tools/hvigor/bin/hvigorw.js' --mode 
 按用户最新要求修复系统标题栏/顶部空间浪费，见后续 P1.12。所有 commit、push、PR/Issue 与真实 DJ 人工测试由用户执行；本轮保留既有工作区/IDE 改动。
 
 > 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+
 
 ## Task P1.12 — 2026-09-28 顶部留白与全屏窗口生命周期
 
@@ -1004,5 +1006,333 @@ Status: **IN PROGRESS（修补已打包、平板和手机安装成功；手机�
 解锁后续测：先截图确认手机实际尺寸及前台；原版横屏缩放/全界面、Preferences 各分类和原按钮/滑动、popup 点选、六个 H/M/L 调整/复位及进程/日志、首次 Music 和 logs 目录授权及长按拖到 Deck。不得沿用平板坐标倍率，截图和依赖截图的输入分开调用。物理正反旋转和摄像头遮挡仍需现场复核。
 
 所有证据在 `docs/ohos/logs/20260928-continuation/`，仅本地保存；无卸载/清数据，无 commit/push/PR/Issue。
+
+> 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+## Task P1.17 — 平板触摸操作与 Windows 曲库迁移首版
+
+> 本节由 AI Agent 自动生成，供用户审阅。This section was written autonomously by an AI Agent.
+
+Date: 2026-09-29
+
+Status: **DONE（首版交付，授权 USB 平板覆盖安装与所列操作通过；真实音乐、完整演奏语义及大包性能另待验收）**
+
+### Goal and scope
+
+用户已接受布局，本轮继续平板触摸操作和 PC 曲库导入。保留原 Mixxx 主界面、皮肤、歌曲菜单和 CueMenu，新增入口放入原“选项”菜单。按触屏输入来源处理，真实鼠标键盘沿原分支。本轮操作设备仅 USB 平板 `5KPBB25818203996`，2560×1600；手机无本轮新增输入或覆盖安装。
+
+### Changed files and implementation
+
+- `src/widget/wtracktableview.{h,cpp}`：单指长按约 700 ms 进入准备态，原位松手开原歌曲菜单，准备后移动复用 DragAndDropHelper/QDrag；滚动不转拖放，触摸多选复用 selectionModel。
+- `src/widget/knobeventhandler.h`：触屏旋钮按上下相对位移调节，速度读取触摸设置；保留原 control 及桌面分支，OHOS 不使用会导致 P1.16 闪退的 custom cursor/回位。
+- `src/platform/ohos/touchcompat.h`、`src/widget/wwidget.cpp`、`wpushbutton.cpp`：独立 synthetic Mouse QPointingDevice，派生事件保留真实触屏来源、点和时间戳；按下/移动/释放的 button/buttons 和空点 TouchCancel 成对处理。直接以 TouchScreen device 构造 QMouseEvent 会改写 Qt 持久 point0 并丢后续事件，已通过 host 和平板复现定位；继续经原 QWidget::event 分派。双击复位限旋钮/推子，不为演奏按钮延迟按下。
+- `src/widget/whotcuebutton.cpp`：触摸编辑点按开原 CueMenu；短拖根据各原 Hotcue 的 global bounds 确认落点，调用原 Track::swapHotcues；槽位外取消。Qt QDrag 在本设备短距离拖动漏相邻目标，编辑触摸采用上述落点确认。进入编辑时释放残留原按住状态，交换后菜单恢复。鼠标和非编辑拖放仍沿原 QDrag，OHOS drag 使用 pixmap。
+- `src/platform/ohos/windowadapter.{h,cpp}`、`src/widget/wmainmenubar.cpp`：原菜单增加旋钮滑动速度、多选、Hotcue 编辑和屏幕边缘模式。速度/留边保存；多选/编辑是临时操作模式。标准 QMessageBox/QProgressDialog/QInputDialog/QFileDialog 保留私有布局，避免搬移和反复 resize 导致窄高增长、按钮不可达。
+- `packaging/ohos/entry/src/main/ets/common/SafeDisplay.ets`、`qability/QAbility.ets`、native media bridge 及类型声明：按当前窗口实际边缘、挖孔和圆角计算留边，自动/完全全屏/保守留边供原皮肤及弹窗使用。用户布局反馈接受不等同实体摄像头触控验收。
+- `tools/ohos-migration/`：中文 Tkinter 便携 EXE，支持配置目录/cfg/RAR/ZIP；随包 7-Zip 与许可；SQLite 只读+backup 快照。多音乐根映射、单首手工关联、同名不同 location 独立落地、缺失保留；过滤 PC 路径/凭据，携带实际音乐、封面、采样器、效果、控制器文件和可选 analysis。流式 ZIP_STORED/ZIP64、SHA256、进度/取消、空间检查、结束校验；来源配置/数据库/音频不改写。
+- `src/platform/ohos/migration{,archive}.{h,cpp}`、`src/mixxxmainwindow.cpp`、`CMakeLists.txt`、`QAbilityStage.ets`：原菜单系统文件选择、数量/空间预览、后台流式校验，导入新档案；SchemaManager 在副本升级数据库，映射实际落地路径并保留 track/location/CUE/列表 ID。新档案保留本机 soundconfig.xml，通过 readAll+QSaveFile 复制，修复设备上 QFile::copy 失败。启动仅接受 id 一致且 state=ready 的 import.json；原菜单切换/还原档案，下次启动生效。
+- 完成回调同步删除进度窗，再下一事件循环显示结果，修复结果窗叠在 progress 上。公共导入摘要写出失败记录 warning，不把已经提交成功的档案误报为失败。
+
+设置/DB 各档案独立，公共 `Music` 根共用。导入音频在 `Music/Imported/<档案 ID>`；启动扫描可发现其它批次音频。切换档案不移动这些文件，也不等于撤回公共目录新增歌曲。
+
+### Build and deliverables
+
+容器 `mixxx-ohos-build`，输出 `/data/mixxx-build/ohos/libmixxx.so`。本轮使用忽略目录中的 `relink*.py` 按 Ninja 原编译/归档/链接命令增量构建，最终 `relink_widget.py` 覆盖 wwidget/wpushbutton/whotcue/wtracktable/windowadapter，并明确链接 migration 两对象。普通 build.ninja 尚未完成完整重新配置；未来干净/正常构建需重新生成以包含 CMake 中新增的两个源文件。
+
+最终构建和核验入口（在仓库根目录）：
+
+```powershell
+& docs/ohos/logs/20260929-implementation/pc-env/Scripts/python.exe docs/ohos/logs/20260929-implementation/relink_widget.py
+docker exec -e STAGE_ONLY=1 -e OHOS_SDK_ROOT=/apps/harmony/sdk/default/openharmony mixxx-ohos-build bash /data/src/mixxx/packaging/ohos/build-hap.sh
+$env:DEVECO_SDK_HOME = 'C:/Program Files/Huawei/DevEco Studio/sdk'
+$env:JAVA_HOME = 'C:/Program Files/Huawei/DevEco Studio/jbr'
+```
+
+在 `packaging/ohos` 执行 DevEco `hvigorw.js --mode module -p module=entry@default -p product=default assembleHap --no-daemon`。`widget-relink-final.log`、`stage-final.log` 成功；`hvigor-final.log`：**BUILD SUCCESSFUL in 18 s 130 ms**。指定平板执行 `hdc -t 5KPBB25818203996 install -r`，成功，保留应用数据。
+
+| 产物 | 大小/最终 SHA256 |
+|---|---|
+| `dist/ohos/PomeloMixxx-P1.17-unsigned.hap` | 321732851 bytes；`9a814c598699f124d8ad7f7d6d976bd174b603e7f10edfc0e20f7adb377b93f3` |
+| `dist/ohos-migration/PomeloMixxxMigration-portable.zip` | 15260251 bytes；`3d758a5d4333001d49eb69fc0746320f4f9c2d270f640132b8c30819246ed672` |
+| 平板覆盖安装的 signed HAP | `df75c14e852a936453580b50dfd1e841fa50a11116f1d89c3ecbd01d9db2dd6e` |
+| `libmixxx.so` native/staged | `9210be75b5fb0d7ffdd13dbe5eafbe27fe71990a03e613c0d29c576b9c076114` |
+| `libmixxx.so` stripped/packed | `2ac00b77353cf5d8f01f27fa2d89d76f9cc26984420ca1d113807e58344751e0` |
+
+`final-artifacts.json` 验证 packed=stripped、含最终 Hotcue touch swap 代码、3246 资源逐字节一致，无用户 DB 入包。收尾另核对容器 native=staged。README 更新后重新打入 PC ZIP，EXE 未改变。
+
+### Validation
+
+| 验收项 | 结果和边界 |
+|---|---|
+| PC 核心 | 6 tests PASS；便携 EXE 与随包 RAR reader 实际读取用户 Mixxx.rar，GUI 展示 1521 条歌曲、4 个根 |
+| 原生 archive reader | 正常解包、SHA 错误、危险路径、无效清单、压缩格式拒绝及取消 PASS；只接受工具输出的 stored ZIP |
+| ZIP64 | 稀疏文件中央目录偏移超过 4 GiB，解析及取消 PASS；未进行 12 GB 真实音乐全量导入性能测试 |
+| 留边计算 | 左/右挖孔、圆角、中央/靠边浮窗、fallback 和小尺寸数学回归 PASS；实体遮挡需现场复核 |
+| 曲库触摸 | 长按原位松手开原菜单；长按后移动将两首同名 WAV 分别一次加载左右 Deck；多选增减；1519 行缺失列表纵向和曲库横向滑动不误拖 |
+| H/M/L | 六个旋钮上下相对调节及双击复位，无崩溃；精细/标准/快速可选，精细设置覆盖安装后保留 |
+| Hotcue 编辑 | 点按原 CueMenu、改色、相邻 1→2→1 往返交换、交换后再点 1 打开菜单，以及槽位外取消均通过 |
+| Touch 事件 host | 真实 Qt Touch 一次 press/move/release，保留输入来源/buttons，空点取消释放 PASS；`widget-touch-final.log` |
+| 平板导入 | 两次导入完成，progress 消失；新档案重启加载，schema 39→40、quick_check=ok、无孤立 location、本机 soundconfig 保留 |
+| 样本数据 | 原 499 CUE、2439 PlaylistTracks、crates/crate_tracks 全表一致；146 原列表逐行一致。第二档案运行新增 2 个历史相关列表、公共扫描新增 3 条其它测试音频记录 |
+
+测试包**只带两首 4 秒静音 WAV**，文件名相同但 location/落地路径独立；1519 首仍缺失，原 1521 元数据保留。真实音乐未提供，未验证原歌曲身份/音质或真实 CUE 落点。合成音频的摘要和路径验证不能代替实际音乐验收。
+
+普通 CUE 按住预听/松手恢复暂停此前通过。最终新建 Hotcue 原生日志仅记录到 press，编辑模式已记录成对 press/release；**不宣称全部演奏按住语义已完成真机验收**。多指、全部演奏行为由真实 DJ 操作复核，不继续猜测性重写全局事件。
+
+### Restore and original data verification
+
+通过原“选项 → 配置档案／还原 → 本机原始档案”切回，`active-profile` 为零字节。清理脚本先核验测试 profile 的 id/state/packageId/included=2/missing=1519、canonical 路径、预期合成 WAV 数量及 SHA256，只删除两个测试档案及对应四个合成 WAV。没有删除用户真实 MP3 或公共根目录。
+
+恢复截图 `pad-original-restored.png`：原 Deere (64 Samplers)、Effects 布局、音轨(6)，双 Deck 空且暂停，无模态窗。读回原 cfg/DB 后仅本地只读核验，`pad-original-final-validation.json`：
+
+- 原 cfg **逐键及字节完全一致**：Deere (64 Samplers)、Scheme 空、ScaleFactor=0.75、show_mixer=1、show_stem_controls=0。
+- `quick_check=ok`；library/track_locations 各 8 条逐行一致，其中 6 首可见；原 12 条 CUE、20 条 PlaylistTracks 及曲目顺序逐行一致；crates/crate_tracks 保持。
+- 18 个原非占位列表逐行一致；原 SetlogFeature 启动逻辑重建一个空锁定 historyPlaceholder 并新增一个空历史列表，因此 Playlists 数量 19→20，非曲库迁移丢失。
+
+没有卸载/清数据、提交/push/PR/Issue；工作区原有改动保留。
+
+### User workflow and evidence
+
+PC 解压便携 ZIP → 选择旧目录/cfg/RAR/ZIP → 为各旧音乐根映射实际音乐位置、处理单首疑义 → 默认携带音乐生成 ZIP → 复制到 `Download/com.pomelo.mixxx` → 原“选项 → 导入 Windows 迁移包” → 核对携带/缺失数量并导入 → 关闭并重新打开。原“配置档案／还原”可切回。详见 `tools/ohos-migration/README.md` 和 `TOUCH_AND_WINDOWS_IMPORT_PLAN.md` §0。
+
+本地证据在忽略目录 `docs/ohos/logs/20260929-implementation/`：
+
+- 构建/产物：`widget-relink-final.log`、`stage-final.log`、`hvigor-final.log`、`final-artifacts.json`、`pad-install.log`。
+- PC/reader：`pc-tests.log`、`frozen-inspect.json`、`real-sample-test.log`、`native-tests.log`、`large-zip64-test.log`、`safe-display-test.log`。
+- 手势：`pad-touch-latest-decks.png`、`pad-multi-select.png`、`pad-multi-toggle.png`、`pad-touch-missing-scrolled.png`、`pad-touch-horizontal-latest.png`、`pad-touch-six-eq.png`、`pad-touch-speed-retained.png`、`pad-touch-hotcue-final-adjacent.png`、`pad-final-edited-hotcue-menu.png`、`pad-hotcue-outside-cancel.png`、`widget-touch-final.log`。
+- 导入/还原：`pad-import-final-result.png`、`pad-db-final-validation.json`、`pad-test-cleanup.json`、`pad-original-restored.png`、`pad-original-final-validation.json`。原日志、数据库和包含来源路径的材料只本地保存。
+
+用户可取 `Download/com.pomelo.mixxx/logs/{mixxx.log,ability.log,import-<档案 ID>.json}`；当前运行日志会轮转。切换档案后公共 Music 的其它批次仍可被扫描。
+
+### Remaining work
+
+真实音乐身份/音质与 CUE 落点、12 GB 实际包性能、实体正反横屏与挖孔附近触摸、真实鼠标键盘、多指和 DJ 低延迟仍待验收。尚未实现多卷/补充包、设备端缺失音乐关联、按歌单选音频、合并当前库、自定义皮肤资源迁移和 OHOS 直接读 RAR；控制器文件可携带不等于支持对应硬件。
+
+> 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+## Task P1.18 — 版本跟随上游与 PC 目录迁移入口
+
+> 本节由 AI Agent 自动生成，供用户审阅。This section was written autonomously by an AI Agent.
+
+Date: 2026-09-29
+
+Status: **DONE（版本回归、直接目录读取、便携工具和 HAP 打包、平板覆盖安装/关于版本核验通过）**
+
+### Request and changes
+
+用户要求程序版本跟随原开源工程，增加最后一段自有迭代号；另明确 PC 迁移的常规入口应直接读取 PC 目录，不要求制作 RAR。
+
+- `packaging/ohos/version.json`：仅维护旧柚 revision，当前为 1。前三段和预发布标记取实际源码的 `CMakeLists.txt`，当前上游 `2.7.0-alpha`，显示 `2.7.0.1-alpha`。
+- `cmake/ohos/ConfigureVersion.cmake`、`src/platform/ohos/version.h.in`、`CMakeLists.txt`：OHOS 配置时生成显示版本头，并将 revision 文件登记为重新配置依赖。
+- `packaging/ohos/version.cjs`、`hvigorfile.ts`、`AppScope/app.json5`：每次 DevEco/Hvigor 打包自动同步 versionName/versionCode。code 按上游三段、alpha/beta/rc/正式版阶段及旧柚 revision 排序，当前 `207000001`，可以覆盖历史 code=`1000000` 的包；规则见 `VERSIONING.md`。
+- `src/util/versionstore.{h,cpp}`、`src/main.cpp`、`src/dialog/dlgabout.cpp`、`src/qml/qmlapplicationproxy.cpp`：新增 applicationVersion，供关于、Qt/QML 显示和启动日志使用。原 version()/versionNumber()/versionSuffix() 及配置升级继续保持上游语义。
+- `tools/ohos-migration/migration_gui.py`：自动识别默认配置目录；主要按钮为“读取本机 Mixxx 配置”“选择其他配置目录”，显示识别出的目录。cfg/RAR/ZIP 是已有备份的次要入口。正常直接读配置目录和原有效音乐路径，不要求先压缩；搬过位置的音乐仍可映射。
+- 更新 `tools/ohos-migration/README.md`、计划、交接文档，新增 `docs/ohos/VERSIONING.md`。开发任务 P1.xx 保留作历史编号，新 HAP 文件名使用实际显示版本。
+
+### Build and validation
+
+证据目录：`docs/ohos/logs/20260929-version/`。
+
+- `node --test packaging/ohos/version.test.cjs`：2 tests PASS；自有迭代递增、上游版本变动自动跟随、manifest 同步，alpha→beta→rc→正式版→下个 patch 在 revision 重置后 code 仍递增。测试仅创建/清理经路径核验的临时夹具。
+- `smoke_pc_directory.py`：直接配置目录自动识别与 GUI 读取 1521 条/499 CUE/146 列表/4 根；重建 frozen EXE 的 `--inspect` 直接读同一目录也通过。前后源 cfg/DB 的 SHA256 不变，未要求或调用备份解压入口。样本来自此前只读提取目录，不代表这台 PC 已安装 Windows Mixxx。
+- 便携工具重新执行 `tools/ohos-migration/build.ps1 -Python <pc-env/python.exe>`，`pc-build.log` 成功；更新同一分发 ZIP。
+- Native 增量 `docker exec mixxx-ohos-build python3 /data/src/mixxx/docs/ohos/logs/20260929-version/relink_version.py`：重建三个 PCH，再编译 versionstore/about/QML proxy/main，归档并链接；明确保留 migration 两对象，`native-build.log` PASS。正常构建仍应重新生成 CMake/Ninja 文件。
+- `build-hap.sh` STAGE_ONLY 暂存，DevEco `hvigorw.js --mode module -p module=entry@default -p product=default assembleHap --no-daemon`：`hvigor.log` 首行记录自动版本同步，**BUILD SUCCESSFUL in 23 s 148 ms**。
+- HAP 内 module.json versionName/code 正确，stripped=packed native，包含 UTF-16 显示版本字符串，无用户 DB。容器 native=staged 的 SHA256 同值。
+- 仅指定 USB 平板 `5KPBB25818203996` 覆盖安装成功、启动成功；前后截图保留原 Deere 皮肤和音轨(6)。关于显示 `旧柚Mixxx 2.7.0.1-alpha`，启动日志一致。读回 cfg **逐键保持不变**，配置 Version 仍为 `2.7.0-alpha`。关于关闭，双 Deck 空/暂停，无模态窗；手机无本轮操作。
+
+| 产物 | SHA256 |
+|---|---|
+| `dist/ohos/PomeloMixxx-2.7.0.1-alpha-unsigned.hap`（321732871 bytes） | `78ce9a9a9d9a78a334f15129dc6b6c6d4fd7082c222544d280375c0d5d11ee05` |
+| signed HAP（平板安装） | `06aa1052609a2f3c6738637d1356fe10948bc284534774debcf8a3f66a79ba71` |
+| `libmixxx.so` native/staged | `cceade504351bf49a8c9ab8b3b40a2e76681b5baabdb2b7a75cfa5837f9fb228` |
+| `libmixxx.so` stripped/packed | `20df40442645ba254d323ecb3cbb7abb6641dbada30e53f2c4f3d9d3fb0cab25` |
+| `dist/ohos-migration/PomeloMixxxMigration-portable.zip`（15261037 bytes） | `67f10d6de7eaaef971b7bc56f09f0d651bc665d86ba2d8f87ad1acff6e7adedd` |
+
+`artifacts.json`、`pad-validation.json`、`version-tests.log`、`frozen-directory-inspect.json` 保存摘要。截图及受保护的原配置/日志在 `20260929-implementation/pad-version-{before,installed,about,final}.png`、`pad-version-new.{cfg,log}`，仅本地保存。
+
+没有自动同步/提交/push 上游或创建 PR/Issue，没有卸载/清数据。版本在用户实际同步源码后自动跟随，修改 revision 后需要重新编译和暂存 native。P1.17 的触摸和迁移验收边界保持；本轮没有重复全套 DJ 操作或真实音乐大包测试。
+
+> 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+## Task P1.19 — 预留智慧屏设备支持
+
+> 本节由 AI Agent 自动生成，供用户审阅。This section was written autonomously by an AI Agent.
+
+Date: 2026-09-29
+
+Status: **DONE（智慧屏声明与完整 HAP 打包核验通过，智慧屏真机/遥控器尚未验收）**
+
+用户要求工程包含智慧屏，未来上架可不选该设备范围。根据 HarmonyOS module.json5 的 deviceTypes 定义，智慧屏使用 `tv`。
+
+- `packaging/ohos/entry/src/main/module.json5`：原 `phone/tablet/2in1` 设备声明增加 `tv`。保持原界面及现有鼠标键盘/触摸分支；本轮没有新增遥控器导航实现。
+- `packaging/ohos/version.json`：revision 1→2，生成 `2.7.0.2-alpha`、versionCode=`207000002`。原生版本头及库重建，保持显示版本与系统包版本一致；配置升级版本继续为上游 `2.7.0-alpha`。
+- 复用 P1.18 `relink_version.py` 重建、归档、链接，`native-build.log` PASS；将新 native 同步到 entry/libs，再执行 DevEco `hvigorw.js --mode module -p module=entry@default -p product=default assembleHap --no-daemon`。`hvigor.log`：**BUILD SUCCESSFUL in 42 s 934 ms**。
+- 构建完成后打开 HAP 核验：module.json 的 deviceTypes 四项齐全、pack.info 含 tv；versionName/code 正确；native 含相同显示版本，容器 native=staged、stripped=packed，无用户 DB 入包。
+
+| 产物 | SHA256 |
+|---|---|
+| `dist/ohos/PomeloMixxx-2.7.0.2-alpha-unsigned.hap`（321732886 bytes） | `b1ae7abbf76c36e874f6f476713797ddcbe5b290e3e8db1524cf0d0730465037` |
+| signed HAP（仅构建，本轮未安装） | `051de4fca583ce0169bdf90ea30643a08efdd9ad28b98844358cdad57ab8cacb` |
+| `libmixxx.so` native/staged | `cd08f04a83d103e4d9ff202abc12aeb24554757969767d50a5df7d055ee33419` |
+| `libmixxx.so` stripped/packed | `54dce0e6e0de8ee16cb1e0483df997fd43eb93362972361b0b13f268993146fb` |
+
+证据：忽略目录 `docs/ohos/logs/20260929-tv/{native-build.log,hvigor.log,artifacts.json}`，验证入口 `validate_artifacts.py`。本轮未安装或操作设备，平板仍为 P1.18 的 `2.7.0.1-alpha`；PC ZIP 未修改。没有提交/push/PR/Issue。
+
+工程设备声明与最终上架发布范围分开选择。智慧屏实体安装、遥控器焦点与按键操作、音频/后台和导入权限需后续独立验收，不能把包内 tv 声明作为这些功能已通过的证据。
+
+> 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+## Task P1.20 — 系统媒体歌曲封面
+
+> 本节由 AI Agent 自动生成，供用户审阅。This section was written autonomously by an AI Agent.
+
+Date: 2026-09-29
+
+Status: **DONE（源码、构建及平板播放胶囊/展开卡片通过；超级桌面跨设备未实测）**
+
+用户要求后台播放和超级桌面的媒体图像显示歌曲封面。原 ArkTS 会话始终把 startIcon 设置为 AVMetadata.mediaImage，现改为当前歌曲封面，缺失或读取失败回退应用图。
+
+- `src/platform/ohos/mediacontroller.{h,cpp}`：沿用原 CoverInfo 内嵌/外部封面加载器，QtConcurrent 异步读取、缩放至最长边 512、编码 PNG；按封面信息变化触发，以 generation 拒绝迟到结果，换歌清旧图。读取不传 TrackPointer，不修改歌曲封面/标签。
+- `mediabridge.{h,cpp}` 与类型声明：状态、封面键和 PNG 原子发布；`readArtwork(key)` 返回匹配键的 ArrayBuffer，限制 2 MiB。进度 JSON 不携带图片，避免周期重复传大数据。
+- `MixxxMediaSession.ets`：按封面键解码/更新 metadata，按键与 asset 再检查异步结果；无图/坏图回退。只在变化时解码，成功设置 metadata 后释放旧图；异常释放候选；销毁等待初始化与进行中的同步，释放 PixelMap/ImageSource。同步读取最新播放状态，维持原媒体控制和后台任务逻辑。
+- `packaging/ohos/media-session.test.cjs`：5 项行为测试涵盖换歌、同歌封面更新、轮询不重读、迟到图丢弃、状态/图键不匹配重试、坏图回退、setAVMetadata 失败重试及销毁资源释放。使用 TypeScript 转译实际 ArkTS 源码并模拟系统 API；与 2 项版本测试合计 **7 tests PASS**，不是原生/系统服务的替代验收。
+- revision=3，版本 **2.7.0.3-alpha**、code **207000003**，上游配置版本仍为 2.7.0-alpha，设备声明 phone/tablet/2in1/tv。
+
+### Build and validation
+
+证据目录 `docs/ohos/logs/20260929-artwork/`。Native 重建、完整 ArkTS/HAP 编译通过，最终 **BUILD SUCCESSFUL in 12 s 231 ms**。首次增量遗漏 MediaController 创建方；最终明确重编 `mixxxmainwindow.cpp`、三个 PCH、媒体及版本对象，再归档/保留 migration 两对象和链接两库。修改类布局需重编消费者，正常构建应完整重新生成 CMake/Ninja，不能只沿旧 commands 重编 controller。
+
+平板 `5KPBB25818203996` 覆盖安装最终签名包，保留原数据：
+
+- 桌面顶部胶囊显示绿色歌曲封面；展开系统卡片显示相同大封面、标题、进度和播放控件。
+- 系统暂停、下一首由绿封面切到红封面、继续播放、再下一首经第二红封面切到无封面歌曲通过。无封面回退应用图，未残留上一首。后台绿色歌曲位置从约 60 s→120 s→180 s 持续增长，恢复前台正常。
+- 收尾系统暂停、双 Deck 卸载，native asset 为空/position=0；原 Deere (64 Samplers) 界面、原 cfg 逐键/字节相同，8 条歌曲元数据/封面字段和 12 条 CUE 相同。20 条原歌单关联保持，原逻辑新增 4 条本次播放历史；quick_check=ok。
+- `pad-validation.json`、`pad-hilog-final.log` 保存结果；`pad-green-capsule-expanded.png`、`pad-green-paused.png`、`pad-red-next.png`、`pad-no-cover.png` 为系统截图；`card-*` 仅裁剪媒体卡片，减少桌面其它内容。应用/配置快照在 implementation 目录 `pad-artwork-*`，只在本地保存。
+
+| 产物 | SHA256 |
+|---|---|
+| `dist/ohos/PomeloMixxx-2.7.0.3-alpha-unsigned.hap`（321751169 bytes） | `d5d574daba8eefbdd4937942310ff28cb537ea8300ca11ace5eb4a06e358893c` |
+| signed HAP（平板最终安装） | `6ecf34fbc1b61e444164f1b817a87642bfd93f61a46564ebb354ad539374ef57` |
+| `libmixxx.so` native/staged | `4b702061ddc2cf2049b5f321f0e5cbbdd435f2fb3dd122927e2dda7def28e42c` |
+| `libmixxx.so` stripped/packed | `c71fa0c559a2f198da40174cfaa4d87b162bf9af32b1de86d16b17c910c8ed35` |
+| `libmixxxohosmedia.so` native/staged | `1595696b46ffcec652824cad59a627178420a5c5dcef337fff6075943ce410cc` |
+| `libmixxxohosmedia.so` stripped/packed | `9fdef8aa8acf7070ef3521c499e9e124d48f050adad27840b544fe3af9a15a06` |
+
+`artifacts.json`、`validate_artifacts.py` 核验两库和 manifest，原生显示版本与启动日志一致。PC ZIP 未改，无手机或智慧屏本轮操作，无卸载/清数据或 Git 提交/推送。
+
+超级桌面跨设备投送尚未实测；同一 AVSession.mediaImage 已可供系统读取，但不能据此声称所有远端系统入口都验收。播放卡片中的应用身份小角标由系统保留（AVMetadata.bundleIcon 为只读），没有更改桌面应用图标。原版主界面不变。
+
+本轮自动触摸长按/拖歌未成功复验：有 hold/context/drag 原生日志，但菜单未可见、Drop 落入 library；通过原曲库 Enter 加载完成封面测试。该输入路径需后续单独调查，P1.17 历史通过记录不作为当前自动复验通过。没有为封面任务猜测性改写全局输入。
+
+> 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+## Task P1.21 — 官方媒体生命周期与暂停闲置释放
+
+> 本节由 AI Agent 自动生成，供用户审阅。This section was written autonomously by an AI Agent.
+
+Date: 2026-09-29
+
+Status: **DONE（23 项回归、构建与平板切歌/短暂暂停、十分钟后台闲置释放、释放后新建卡片恢复及数据保留核验通过）**
+
+### Official guidance and policy
+
+用户要求未播放闲置后合理关闭实况窗，参考官方建议，避免普通暂停即销毁或一直持有。
+
+- OpenHarmony 官方 `avsession-background-scene.md`：播放时保持 AVSession 和 AUDIO_PLAYBACK 长时任务；暂停/停止时及时主动取消长时任务，继续播放时重新申请；结束进程或完全退出播放业务时销毁会话，避免频繁创建/释放。
+- 鸿蒙没有统一的“暂停 N 分钟收起实况窗”建议。[Android Media3 MediaSessionService](https://github.com/androidx/media/blob/release/libraries/session/src/main/java/androidx/media3/session/MediaSessionService.java) 的公开默认前台服务宽限为 600000 ms。本项目参考选择十分钟，不能表述为鸿蒙官方时限。
+- 首次启动/只加载未播放不创建会话；任一 Deck 播放保持；全部暂停及时取消长时任务，同一会话在十分钟宽限内保留恢复控制；连续暂停到期视为结束本次系统播放业务，STOP→deactivate→destroy，释放歌曲 PixelMap；下次播放创建新会话并重发歌曲、封面和进度。
+- 空载、native 不可用、明确系统 stop 或 Ability 销毁释放；暂停定位/歌曲 metadata 更新不延长计时。停止后台任务独立先于销毁，销毁失败不继续占用播放长时任务，保留会话供重试。
+- 暂停释放长时任务后系统可能冻结 ArkTS 定时器；清理发生在到期后下一次允许执行时，不保证所有设备后台准点十分钟。没有为等待倒计时保留无业务播放保活，也不循环申请短时任务。完整说明与官方链接见 `MEDIA_SESSION_LIFECYCLE.md`。
+
+### Implementation and regressions
+
+- `MixxxMediaSession.ets`：会话按播放需要创建，串行同步与销毁，连续暂停计时，暂停状态去重，系统 stop 优先；销毁异常保留对象重试；延续 P1.20 的封面原子键、迟到图丢弃和 ImageSource/PixelMap 释放。
+- 本机只 deactivate/activate 同一会话后音频能恢复但实况窗不再显示，故十分钟结束后完整销毁，下次新建。该中间试验记录在 `final-avsession-{paused,after-timeout,resumed}.txt` 与 `idle-session-validation.json`；这些旧命名的 final 文件不是最终包验收记录。
+- 首个完整释放候选在 next 异步加载间隙把空 asset 当真正卸载，导致会话销毁后后台新建卡片不恢复；`release-hilog.log` 与 `release-card-next.png` 为失败证据，不能作为切歌通过。
+- `MediaController::publish()` 新增 `loading`：通过每个播放器已提交的曲目与 PlayerInfo 已加载曲目比较区分加载过渡，覆盖系统切歌与 GUI 加载。类布局本次未再改变；bridge 的初始状态明确 loading=false。ArkTS 保留已有会话/封面，加载最多十五秒，失败/超时释放；暂停加载不重启长时任务、不延长闲置期限。系统 play 先申请任务，给尚在 Qt 队列的命令五秒确认，避免旧暂停快照立即撤销新任务。
+- `media-session.test.cjs` 转译实际 ArkTS 并模拟系统 API/时间，21 项媒体测试 + 2 项版本测试 **23 PASS**：十分钟边界、普通暂停复用、超时后新建、初次未播放、定位/metadata 不续期、多 Deck 播放、明确 stop、失败重试、decode/create 与 destroy 并发资源释放，以及 next/previous 异步空加载、加载失败/超时、暂停加载、异步 play 完成/超时、旧快照 stop。
+
+### Build and tablet evidence
+
+证据目录 `docs/ohos/logs/20260929-idle-media/`。revision=4，versionName=`2.7.0.4-alpha`，versionCode=`207000004`，设备声明 phone/tablet/2in1/tv。
+
+- 先重建版本/PCH/创建方和媒体对象，`native-build.log`；切歌修补后 `docker exec mixxx-ohos-build python3 /data/src/mixxx/docs/ohos/logs/20260929-idle-media/relink_transition.py` 重编 controller/bridge、归档时明确保留 migration/migrationarchive，再链接两库，`native-transition-build.log` PASS。正常生产构建应重新生成 CMake/Ninja。
+- 两库同步 entry/libs 后，DevEco `hvigorw.js --mode module -p module=entry@default -p product=default assembleHap --no-daemon`，`hvigor-final.log` **BUILD SUCCESSFUL in 12 s 7 ms**。先确认 exit=0，再运行 `validate_artifacts.py`；容器=staged，两库 stripped=packed，HAP 包含相同 native 显示版本，无用户 DB。
+- 仅授权 USB 平板 `5KPBB25818203996` 覆盖安装签名包，`pad-install-final.log` 成功，PID 8383。`verified-startup.png`/`verified-loaded.png` 为原 Deere 界面；空载启动及加载但未播放的 AVSession dump 均无本应用会话。
+- 13:37:17 开始后台播放，13:38:33 next 绿封面→红封面，13:39:27 previous 红→绿；13:39:46 暂停，13:40:50 系统继续，13:41:52 再暂停。`verified-controls-validation.json` 核验全部控制前后的 session ID 一致，只有一次 activate，没有 retired；`verified-{green,next,previous}-card.png`、`verified-short-{pause,resume}.png` 显示当前封面/进度/控制。13:41:52.011 pause accepted，13:41:52.331 长时任务已取消。
+- `watch_idle.py` 仅读系统会话，每 45 秒记录，无输入或应用前台唤醒；13:51:15 仍 active，13:51:52.492 `retired: paused timeout`，距首次暂停状态 **600.160 秒**。系统在边界另发一次 pause，未重置暂停计时；13:52:00 的系统会话记录已无本应用，`verified-expired-system.png` 确认实况窗消失。该本机结果不保证其它设备冻结后的定时器同样准点。
+- 返回前台 `verified-expired-pad-paused.png` 仍原歌曲 **1:20.44**；13:53:53 播放创建新 ID，`verified-recreated-{capsule,card}.png` 显示绿封面、当前进度与可用控制，后台进度 80.917→141.589 秒。13:55:24 从新卡片暂停成功并取消任务，随后卸载 Deck1；13:57:18 `retired: empty`，双 Deck 空/暂停，系统 dump 无本应用会话。`verified-lifecycle-validation.json` 确认闲置退出、新 ID 与最终空载释放，无本次 media sync 错误。
+- `verified-original-final.png` 为收尾界面；读回本轮最新基线对应的 cfg/DB，`verified-data-validation.json`：cfg **逐字节相同**，8 条歌曲标签/封面字段与路径、**16 条 CUE** 全部相同，原歌单关联保持，quick_check=ok。原逻辑新增 6 条本次播放历史；不恢复上一轮的 12 条 CUE 基线。公共 `Download/com.pomelo.mixxx/logs/{ability.log,mixxx.log}` 仍可读取，启动日志版本一致。
+
+| 产物 | SHA256 |
+|---|---|
+| `dist/ohos/PomeloMixxx-2.7.0.4-alpha-unsigned.hap`（321764371 bytes） | `b0e3156e4d099468e62127f6ded5f702aff82575db02ad6d5ead26387167a284` |
+| signed HAP（平板最终安装） | `3bea008bff25e14ebecdecbaac2dcb9f28db42783f1042b4606dd3cedb212c8d` |
+| `libmixxx.so` native/staged | `a6392e1bc55e0091cbd08aa49a6fd6e5a305e4a232e94db4d3d36f11fd8ed2ed` |
+| `libmixxx.so` stripped/packed | `6251e0099d3efef07da35eba9d887422b2fce9461e1a8a42cef4676c6cc91ec7` |
+| `libmixxxohosmedia.so` native/staged | `1485ac0e4bdb954798f5cc603f5ee1429589cf8957eee45fb04f557217225e76` |
+| `libmixxxohosmedia.so` stripped/packed | `f53e012d7f37ddee8d3090268687878b21180d69feded5275cf4c18010b09478` |
+
+PC 工具未改；没有手机/智慧屏/超级桌面跨设备操作或验收，没有卸载/清数据、Git 提交/推送或 PR/Issue。原版界面、用户设置/歌曲/CUE 保留；主题、触摸和迁移历史边界见 P1.17–P1.20。
+
+> 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.
+
+## Task P1.22 — 上架 APP 构建与发布签名
+
+> 本节由 AI Agent 自动生成，供用户审阅。This section was written autonomously by an AI Agent.
+
+Date: 2026-09-29
+
+Status: **PASS（release APP 构建、发布签名与官方验签完成；尚未上传商店）**
+
+### Goal
+
+按用户指定的 `sign/release/` 发布材料与别名 `hv` 生成上架 APP。保留上游版本规则，本次纯构建/签名不增加 revision：`2.7.0.4-alpha` / `207000004`。
+
+### Changed files
+
+- `dist/ohos/PomeloMixxx-2.7.0.4-alpha-release.app`、`PomeloMixxx-2.7.0.4-alpha-release-signed.hap` 与 `SHA256SUMS-release.txt`。
+- `docs/ohos/HANDOVER_CODEX.md`、本状态文档；本轮未修改应用功能代码或界面。
+- 忽略目录中的 `sign/release/hyperview-release-chain.cer`：原 CER 三张证书顺序为 root→intermediate→leaf，另生成 leaf→intermediate→root 供签名工具读取，原材料保留。忽略的 `docs/ohos/logs/20260929-release/` 保存诊断脚本与验证证据。
+
+### Build
+
+使用 DevEco 自带 Node/JBR/SDK，在 `packaging/ohos` 执行：
+
+```text
+node hvigorw.js --mode project -p product=default -p buildMode=release assembleApp --no-daemon
+```
+
+结果：exit=0，**BUILD SUCCESSFUL in 1 min 6 s 636 ms**；release ArkTS 混淆构建通过。Hvigor 原默认签名产物只作中间输出，分发包另使用用户发布材料签名。
+
+- `hap-sign-tool.jar verify-profile` 验证原 P7B 签名成功：type=`release`、distribution=`app_gallery`、bundle=`com.pomelo.mixxx`，当前在有效期内。P12 的 `hv` 公钥与 Profile 内 leaf 相同；OpenSSL 证书链验证通过。
+- 按本机 Hvigor `SignApp` builder 的官方 `sign-app -mode localSign` 路径，对 project unsigned APP 和独立 unsigned HAP 使用重排的 CER、P12、P7B 与 SHA256withECDSA 签名。密码通过临时环境变量进入 Python，再传给本地签名进程；日志输出脱敏，文件/工程/文档未保存密码。
+- APP/HAP `verify-app` 均成功，导出的 Profile `verify-profile` 均通过且与原 P7B 逐字节一致；导出证书集合与发布链相同，leaf SHA256=`25dc629952304fae1f3fa6abcfe8e52169393c86ba3542282905c066b2e75d89`。官方验签输出链的排列顺序不固定，验证不依赖第一张就是 leaf。
+- APP 使用标准 PackageApp→SignApp 路径，内含 `entry-default.hap`、`pack.info`、`pac.json`；内嵌 HAP 与官方 unsigned APP 内 HAP 逐字节相同，APP 外层发布签名。独立 HAP 另发布签名，未把默认调试签名 HAP 装入 APP。
+- 两包 module.json 核验 versionName=`2.7.0.4-alpha`、code=`207000004`、debug=false、targetAPIVersion=`60100023`、设备 phone/tablet/2in1/tv。两包 native 库哈希一致且匹配 P1.21；不包含用户配置/曲库 DB、P12/JKS 等私钥文件。
+
+| 产物 | bytes | SHA256 |
+|---|---:|---|
+| release APP | 123755826 | `e7d64a35cbd151cf070cd4cee7e96f5a21a184726dfbe8a253324850ed0b23f4` |
+| release signed HAP | 325742873 | `61523ebfda049dca1984ce446bb27c6c65b4c3161e04a0f621c1f99360a959ff` |
+| packed `libmixxx.so` | — | `6251e0099d3efef07da35eba9d887422b2fce9461e1a8a42cef4676c6cc91ec7` |
+| packed `libmixxxohosmedia.so` | — | `f53e012d7f37ddee8d3090268687878b21180d69feded5275cf4c18010b09478` |
+
+### Device validation
+
+本轮没有操作手机/平板/智慧屏，未安装发布包。平板仍为 P1.21 调试签名包，功能与数据保留验收沿用 P1.21；不能将本轮包验签表述为新增设备或商店审核通过。
+
+### Evidence
+
+`docs/ohos/logs/20260929-release/`：`hvigor-release.log`、`preflight.json`、`artifacts.json`、`sign-{app,hap}.log`、`verify-{app,hap}.log`、`{app,hap}-verified-profile.json`、`verify-{app,hap}-profile.log`。`dist/ohos/SHA256SUMS-release.txt` 为新发布包校验清单，旧 unsigned HAP 与其清单保留。
+
+### Remaining blocker
+
+本地构建/签名目标已完成。商店上传、设备范围选择与审核尚未进行，历史功能验证边界沿用 P1.17–P1.21。
+
+### Next step
+
+用户可将 release APP 上传 AppGallery Connect，按实际需求选择上架设备范围；后续代码改动继续遵循 `VERSIONING.md` 的上游版本加第四段迭代规则。
 
 > 本节结束（由 AI Agent 自动生成）。End of autonomously AI-generated section.

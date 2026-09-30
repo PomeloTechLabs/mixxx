@@ -15,6 +15,11 @@ import fs from '@ohos.file.fs';
 import qpa from 'libqohos.so';
 import {APP_LIBRARY_NAME, LOG_DOMAIN, LOG_TAG} from '../common/QtAppConstants';
 
+interface ImportedProfile {
+  id: string;
+  state: string;
+}
+
 export default class QAbilityStage extends AbilityStage {
 
   // setting "appArgs" overrides arguments from initial Want object
@@ -28,14 +33,15 @@ export default class QAbilityStage extends AbilityStage {
       hilog.info(LOG_DOMAIN, LOG_TAG, 'QAbilityStage::initQtAppContextImpl: init');
       QAbilityStage.setupQtApplicationCalled = true;
       hilog.initialize(appContext.filesDir);
-      QAbilityStage.seedMixxxSettings(appContext.filesDir);
+      const settingsDir = QAbilityStage.resolveSettingsDir(appContext.filesDir);
+      QAbilityStage.seedMixxxSettings(appContext.filesDir, settingsDir);
       if (!QAbilityStage.appArgs) {
         // Mixxx needs to find its bundled resources (res/ next to the app
         // library inside the HAP) and a writable settings directory inside
         // the app sandbox.
         const args: Array<string> = [
           '--resource-path', QAbilityStage.resolveMixxxResourceDir(appContext),
-          '--settings-path', appContext.filesDir + '/.mixxx',
+          '--settings-path', settingsDir,
           '--full-screen',
           '--rescan-library',
           '--log-max-file-size', '10000000',
@@ -318,8 +324,24 @@ export default class QAbilityStage extends AbilityStage {
     }
   }
 
-  private static seedMixxxSettings(filesDir: string): void {
-    const settingsDir = filesDir + '/.mixxx';
+  private static resolveSettingsDir(filesDir: string): string {
+    try {
+      const id = fs.readTextSync(filesDir + '/active-profile').trim();
+      if (/^[a-f0-9]{32}$/.test(id)) {
+        const candidate = filesDir + '/profiles/' + id;
+        if (fs.accessSync(candidate + '/mixxx.cfg') && fs.accessSync(candidate + '/import.json')) {
+          const report: ImportedProfile = JSON.parse(fs.readTextSync(candidate + '/import.json')) as ImportedProfile;
+          if (report.state === 'ready' && report.id === id) {
+            hilog.info(LOG_DOMAIN, LOG_TAG, 'QAbilityStage selected imported profile ' + id);
+            return candidate;
+          }
+        }
+      }
+    } catch (_) {}
+    return filesDir + '/.mixxx';
+  }
+
+  private static seedMixxxSettings(filesDir: string, settingsDir: string): void {
     try {
       if (!fs.accessSync(settingsDir)) {
         fs.mkdirSync(settingsDir);

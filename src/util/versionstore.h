@@ -11,6 +11,8 @@ static QString FUTURE_UNSTABLE = QStringLiteral("3.0-unstable");
 /// Returns the current Mixxx version string (e.g. 1.12.0-alpha)
 QString version();
 
+QString applicationVersion();
+
 /// Returns the current Mixxx version number (e.g. 1.12.0)
 QVersionNumber versionNumber();
 

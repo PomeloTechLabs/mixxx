@@ -578,7 +578,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL OHOS)
   message(STATUS "[OHOS] target detected: arch=${OHOS_ARCH}")
 endif()
 # Work around missing version suffixes support https://gitlab.kitware.com/cmake/cmake/-/issues/16716
-set(MIXXX_VERSION_PRERELEASE "alpha") # set to "alpha" "beta" or ""
+set(MIXXX_VERSION_PRERELEASE "") # set to "alpha" "beta" or ""
 
 set(CMAKE_PROJECT_HOMEPAGE_URL "https://www.mixxx.org")
 set(
@@ -2572,6 +2572,8 @@ if(OHOS)
   target_link_libraries(mixxxohosmedia PRIVATE Qt6::Core ace_napi.z)
   target_sources(mixxx-lib PRIVATE
     src/platform/ohos/mediacontroller.cpp
+    src/platform/ohos/migration.cpp
+    src/platform/ohos/migrationarchive.cpp
     src/platform/ohos/windowadapter.cpp)
   target_link_libraries(mixxx-lib PRIVATE mixxxohosmedia Qt6::GuiPrivate)
 endif()
@@ -3288,6 +3290,10 @@ else()
 endif()
 
 get_target_property(MIXXX_BUILD_FLAGS mixxx-lib COMPILE_OPTIONS)
+
+if(OHOS)
+  include(cmake/ohos/ConfigureVersion.cmake)
+endif()
 
 # uses CMAKE_PROJECT_VERSION MIXXX_VERSION_PRERELEASE MIXXX_BUILD_FLAGS
 configure_file(src/version.h.in src/version.h @ONLY)

@@ -170,6 +170,12 @@ class WTrackTableView : public WLibraryTableView {
 #ifdef MIXXX_OS_OHOS
     bool viewportEvent(QEvent* event) override;
     bool m_touchDragPending = false;
+    bool m_touchDragReady = false;
+    QPointF m_touchHoldPosition;
+    QPersistentModelIndex m_touchHoldIndex;
+    void finishTouchHold(bool menu);
+    void startTouchTrackDrag();
+    void mouseReleaseEvent(QMouseEvent* event) override;
 #endif
     void addToAutoDJ(PlaylistDAO::AutoDJSendLoc loc);
     void dragMoveEvent(QDragMoveEvent* event) override;

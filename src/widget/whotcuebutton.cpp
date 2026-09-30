@@ -8,6 +8,9 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <QMouseEvent>
+#ifdef MIXXX_OS_OHOS
+#include "platform/ohos/touchcompat.h"
+#endif
 
 #include "engine/controls/cuecontrol.h"
 #include "mixer/playerinfo.h"
@@ -171,6 +174,23 @@ bool WHotcueButton::isActive() const {
 }
 
 void WHotcueButton::mousePressEvent(QMouseEvent* pEvent) {
+#ifdef MIXXX_OS_OHOS
+    if (pEvent->button() == Qt::LeftButton &&
+            pEvent->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen &&
+            qApp->property("ohosTouchHotcueEdit").toBool()) {
+        if (isPressed()) {
+            QMouseEvent release(QEvent::MouseButtonRelease, pEvent->position(),
+                    pEvent->globalPosition(), Qt::LeftButton, Qt::NoButton, Qt::NoModifier,
+                    mixxx::ohos::touchConversionMouseDevice());
+            WPushButton::mouseReleaseEvent(&release);
+        }
+        setProperty("ohosTouchEditing", true);
+        setProperty("ohosTouchEditMoved", false);
+        setProperty("ohosTouchEditPressPosition", pEvent->globalPosition());
+        DragAndDropHelper::mousePressed(pEvent);
+        return;
+    }
+#endif
     const bool rightClick = pEvent->button() == Qt::RightButton;
     if (rightClick) {
         if (isPressed()) {
@@ -219,6 +239,39 @@ void WHotcueButton::mousePressEvent(QMouseEvent* pEvent) {
 }
 
 void WHotcueButton::mouseReleaseEvent(QMouseEvent* pEvent) {
+#ifdef MIXXX_OS_OHOS
+    if (property("ohosTouchEditing").toBool()) {
+        setProperty("ohosTouchEditing", false);
+        if (property("ohosTouchEditMoved").toBool()) {
+            const auto track = PlayerInfo::instance().getTrackInfo(m_group);
+            if (track && track->getId().isValid()) {
+                for (auto* target : window()->findChildren<WHotcueButton*>()) {
+                    if (target == this || !target->isVisible() || !target->isEnabled() ||
+                            target->m_hotcue == Cue::kNoHotCue) {
+                        continue;
+                    }
+                    const QRectF bounds(target->mapToGlobal(QPoint(0, 0)),
+                            target->mapToGlobal(QPoint(target->width(), target->height())));
+                    if (!bounds.contains(pEvent->globalPosition())) {
+                        continue;
+                    }
+                    const auto targetTrack = PlayerInfo::instance().getTrackInfo(target->m_group);
+                    if (targetTrack && targetTrack->getId() == track->getId()) {
+                        track->swapHotcues(m_hotcue, target->m_hotcue);
+                        qInfo() << "OHOS hotcue touch swap" << m_hotcue << target->m_hotcue;
+                    }
+                    break;
+                }
+            }
+        } else {
+            QMouseEvent secondary(QEvent::MouseButtonPress, pEvent->position(),
+                    pEvent->globalPosition(), Qt::RightButton, Qt::RightButton, Qt::NoModifier,
+                    mixxx::ohos::touchConversionMouseDevice());
+            mousePressEvent(&secondary);
+        }
+        return;
+    }
+#endif
     const bool rightClick = pEvent->button() == Qt::RightButton;
     if (rightClick) {
         // Don't handle stray release events
@@ -228,6 +281,9 @@ void WHotcueButton::mouseReleaseEvent(QMouseEvent* pEvent) {
 }
 
 void WHotcueButton::mouseMoveEvent(QMouseEvent* pEvent) {
+    if (m_dragging) {
+        return;
+    }
     TrackPointer pTrack = PlayerInfo::instance().getTrackInfo(m_group);
     if (!pTrack) {
         return;
@@ -240,7 +296,23 @@ void WHotcueButton::mouseMoveEvent(QMouseEvent* pEvent) {
         return;
     }
 
+#ifdef MIXXX_OS_OHOS
+    if (property("ohosTouchEditing").toBool() &&
+            pEvent->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen) {
+        const auto delta = pEvent->globalPosition() - property("ohosTouchEditPressPosition").toPointF();
+        const int threshold = qMax(3, qMin(QApplication::startDragDistance(), qMin(width(), height()) / 3));
+        if (delta.x() * delta.x() + delta.y() * delta.y() >= threshold * threshold) {
+            setProperty("ohosTouchEditMoved", true);
+        }
+        return;
+    }
+#endif
     if (DragAndDropHelper::mouseMoveInitiatesDrag(pEvent)) {
+#ifdef MIXXX_OS_OHOS
+        if (property("ohosTouchEditing").toBool()) {
+            setProperty("ohosTouchEditMoved", true);
+        }
+#endif
         const TrackId id = pTrack->getId();
         VERIFY_OR_DEBUG_ASSERT(id.isValid()) {
             return;
@@ -257,10 +329,26 @@ void WHotcueButton::mouseMoveEvent(QMouseEvent* pEvent) {
         // i.e. these render with sharp corners and qss 'border-radius'
         // is not visible in the drag image.
         const QPixmap currLook = grab(rect().marginsRemoved(m_dndRectMargins));
+#ifdef MIXXX_OS_OHOS
+        pDrag->setPixmap(currLook);
+#else
         pDrag->setDragCursor(currLook, Qt::MoveAction);
+#endif
 
         m_dragging = true;
+#ifdef MIXXX_OS_OHOS
+        const bool touchDrag = pEvent->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen;
+        if (touchDrag) {
+            qApp->setProperty("ohosTouchWidgetDrag", true);
+        }
+#endif
         pDrag->exec();
+#ifdef MIXXX_OS_OHOS
+        if (touchDrag) {
+            qApp->setProperty("ohosTouchWidgetDrag", false);
+            setProperty("ohosTouchEditing", false);
+        }
+#endif
         m_dragging = false;
 
         // Release this button afterwards.
@@ -288,6 +376,9 @@ void WHotcueButton::dropEvent(QDropEvent* pEvent) {
                     this,
                     QList<int>{m_hotcue, kMainCueIndex},
                     &dragData)) {
+#ifdef MIXXX_OS_OHOS
+        qInfo() << "OHOS hotcue swap" << dragData.hotcue << m_hotcue;
+#endif
         pTrack->swapHotcues(dragData.hotcue, m_hotcue);
     } else {
         pEvent->ignore();

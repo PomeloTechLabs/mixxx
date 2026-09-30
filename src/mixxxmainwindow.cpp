@@ -3,6 +3,7 @@
 #ifdef MIXXX_OS_OHOS
 #include "platform/ohos/windowadapter.h"
 #include "platform/ohos/mediacontroller.h"
+#include "platform/ohos/migration.h"
 #endif
 
 #include <QCheckBox>
@@ -405,10 +406,11 @@ void MixxxMainWindow::initialize() {
     m_pCoreServices->getSoundManager()->getConfig().writeToDisk();
 
 #ifdef MIXXX_OS_OHOS
-    m_pOhosWindow = new mixxx::ohos::WindowAdapter(this);
+    m_pOhosWindow = new mixxx::ohos::WindowAdapter(this, pConfig);
     m_pOhosWindow->setSkin(m_pCentralWidget);
     m_pOhosMedia = new mixxx::ohos::MediaController(
             m_pCoreServices->getLibrary().get(), pPlayerManager.get(), this);
+    mixxx::ohos::installMigrationActions(this, pConfig);
 #else
     // this has to be after the OpenGL widgets are created or depending on a
     // million different variables the first waveform may be horribly

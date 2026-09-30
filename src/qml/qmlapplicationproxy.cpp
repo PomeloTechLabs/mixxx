@@ -91,7 +91,7 @@ QString QmlApplicationProxy::applicationName() const {
 }
 
 QString QmlApplicationProxy::version() const {
-    return VersionStore::version();
+    return VersionStore::applicationVersion();
 }
 
 QString QmlApplicationProxy::platform() const {

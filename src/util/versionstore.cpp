@@ -26,6 +26,9 @@
 
 #include "util/gitinfostore.h"
 #include "version.h"
+#ifdef MIXXX_OS_OHOS
+#include "platform/ohos/version.h"
+#endif
 
 // https://stackoverflow.com/questions/240353/convert-a-preprocessor-token-to-a-string#comment84146590_240370
 #define STRINGIFY(x) #x
@@ -64,6 +67,14 @@ QString VersionStore::version() {
 // static
 QVersionNumber VersionStore::versionNumber() {
     return kMixxxVersionNumber;
+}
+
+QString VersionStore::applicationVersion() {
+#ifdef MIXXX_OS_OHOS
+    return QStringLiteral(MIXXX_OHOS_VERSION);
+#else
+    return version();
+#endif
 }
 
 // static
@@ -210,7 +221,7 @@ QStringList VersionStore::dependencyVersions() {
 }
 
 void VersionStore::logBuildDetails() {
-    QString version = VersionStore::version();
+    QString version = VersionStore::applicationVersion();
     QString buildFlags = VersionStore::buildFlags();
 
     QStringList buildInfo = {

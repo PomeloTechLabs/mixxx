@@ -1,8 +1,11 @@
 #include "mediacontroller.h"
 
+#include <QBuffer>
+#include <QFutureWatcher>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTimer>
+#include <QtConcurrentRun>
 #include <algorithm>
 #include <cmath>
 
@@ -31,6 +34,45 @@ MediaController::~MediaController() {
     detachMediaBridge(this);
 }
 
+void MediaController::updateArtwork(const TrackPointer& track) {
+    const CoverInfo coverInfo = track ? track->getCoverInfoWithLocation() : CoverInfo();
+    if (coverInfo == m_coverInfo) {
+        return;
+    }
+    m_coverInfo = coverInfo;
+    m_artwork.clear();
+    const auto revision = ++m_artworkRevision;
+    if (!coverInfo.hasImage()) {
+        return;
+    }
+    auto* watcher = new QFutureWatcher<QByteArray>(this);
+    connect(watcher, &QFutureWatcher<QByteArray>::finished, this, [this, watcher, revision] {
+        const auto artwork = watcher->result();
+        watcher->deleteLater();
+        if (revision != m_artworkRevision) {
+            return;
+        }
+        m_artwork = artwork;
+        ++m_artworkRevision;
+        publish();
+    });
+    watcher->setFuture(QtConcurrent::run([coverInfo] {
+        auto image = coverInfo.loadImage().image;
+        if (image.isNull()) {
+            return QByteArray();
+        }
+        if (image.width() > 512 || image.height() > 512) {
+            image = image.scaled(512, 512, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        }
+        QByteArray bytes;
+        QBuffer buffer(&bytes);
+        if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG")) {
+            return QByteArray();
+        }
+        return bytes;
+    }));
+}
+
 void MediaController::publish() {
     auto& info = PlayerInfo::instance();
     const int deck = info.getCurrentPlayingDeck();
@@ -38,6 +80,15 @@ void MediaController::publish() {
         m_group = PlayerManager::groupForDeck(deck);
     }
     const auto tracks = info.getLoadedTracks();
+    bool loading = false;
+    for (const auto& group : m_players->getVisualPlayerGroups()) {
+        const auto* player = m_players->getPlayer(group);
+        const auto requested = player ? player->getLoadedTrack() : TrackPointer();
+        if (requested && requested != tracks.value(group)) {
+            loading = true;
+            break;
+        }
+    }
     bool playing = false;
     for (auto it = tracks.cbegin(); it != tracks.cend(); ++it) {
         if (it.value() && ControlObject::get(ConfigKey(it.key(), "play")) > 0) {
@@ -57,18 +108,23 @@ void MediaController::publish() {
             }
         }
     }
+    updateArtwork(track);
     const double duration = track ? std::max(0.0, track->getDuration() * 1000) : 0;
     const double fraction = ControlObject::get(ConfigKey(m_group, "playposition"));
     QJsonObject state;
     state.insert("ready", true);
     state.insert("playing", playing);
+    state.insert("loading", loading);
     state.insert("assetId", track ? track->getId().toString() : QString());
     state.insert("title", track ? track->getTitleInfo() : QString());
     state.insert("artist", track ? track->getArtist() : QString());
     state.insert("album", track ? track->getAlbum() : QString());
+    const QString artworkKey = QString::number(m_artworkRevision);
+    state.insert("artworkKey", artworkKey);
+    state.insert("artworkAvailable", !m_artwork.isEmpty());
     state.insert("duration", duration);
     state.insert("position", std::clamp(fraction, 0.0, 1.0) * duration);
-    publishMediaState(QJsonDocument(state).toJson(QJsonDocument::Compact));
+    publishMediaState(QJsonDocument(state).toJson(QJsonDocument::Compact), artworkKey, m_artwork);
 }
 
 void MediaController::command(const QString& name, double value) {

@@ -12,6 +12,7 @@
 #include <QScroller>
 #include <QTapAndHoldGesture>
 #include <QTouchEvent>
+#include <QWindow>
 #endif
 
 #include "control/controlobject.h"
@@ -38,6 +39,41 @@
 #include "widget/wtracktableviewheader.h"
 
 namespace {
+
+#ifdef MIXXX_OS_OHOS
+class TouchDragReleaseFilter final : public QObject {
+  public:
+    TouchDragReleaseFilter() {
+        qApp->installEventFilter(this);
+    }
+
+  protected:
+    bool eventFilter(QObject*, QEvent* event) override {
+        if (event->type() == QEvent::TouchCancel) {
+            QTimer::singleShot(0, this, [] { QDrag::cancel(); });
+        } else if (event->type() == QEvent::TouchEnd) {
+            const auto* touch = static_cast<QTouchEvent*>(event);
+            if (!touch->points().isEmpty()) {
+                const auto position = touch->points().front().globalPosition();
+                const auto* device = touch->pointingDevice();
+                const auto window = QPointer<QWindow>(QGuiApplication::focusWindow());
+                QTimer::singleShot(0, this, [position, device, window] {
+                    if (window) {
+                        const auto local = window->mapFromGlobal(position);
+                        QMouseEvent release(QEvent::MouseButtonRelease,
+                                local, local, position, Qt::LeftButton,
+                                Qt::NoButton, Qt::NoModifier,
+                                Qt::MouseEventSynthesizedByQt, device);
+                        qInfo() << "OHOS touch drag release fallback" << position;
+                        QCoreApplication::sendEvent(window, &release);
+                    }
+                });
+            }
+        }
+        return false;
+    }
+};
+#endif
 
 // ConfigValue key for QTable vertical scrollbar position
 const ConfigKey kVScrollBarPosConfigKey{
@@ -733,6 +769,15 @@ void WTrackTableView::mousePressEvent(QMouseEvent* pEvent) {
 #ifdef MIXXX_OS_OHOS
     m_touchDragPending = pEvent->button() == Qt::LeftButton &&
             pEvent->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen;
+    if (m_touchDragPending && qApp->property("ohosTouchMultiSelect").toBool()) {
+        const auto index = indexAt(pEvent->position().toPoint());
+        if (index.isValid()) {
+            selectionModel()->select(index, QItemSelectionModel::Toggle | QItemSelectionModel::Rows);
+            selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
+            pEvent->accept();
+            return;
+        }
+    }
 #endif
     DragAndDropHelper::mousePressed(pEvent);
     WLibraryTableView::mousePressEvent(pEvent);
@@ -744,12 +789,25 @@ bool WTrackTableView::viewportEvent(QEvent* event) {
         m_touchDragPending = static_cast<QTouchEvent*>(event)->points().size() == 1;
     } else if (event->type() == QEvent::TouchUpdate) {
         const auto& points = static_cast<QTouchEvent*>(event)->points();
-        if (points.size() != 1 ||
+        if (points.size() != 1) {
+            finishTouchHold(false);
+        } else if (m_touchDragReady) {
+            if ((points.front().position() - m_touchHoldPosition).manhattanLength() >= QApplication::startDragDistance()) {
+                startTouchTrackDrag();
+            }
+            event->accept();
+            return true;
+        } else if (
                 (points.front().position() - points.front().pressPosition()).manhattanLength() >=
                         QApplication::startDragDistance()) {
             m_touchDragPending = false;
         }
     } else if (event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchCancel) {
+        if (m_touchDragReady) {
+            finishTouchHold(event->type() == QEvent::TouchEnd);
+            event->accept();
+            return true;
+        }
         m_touchDragPending = false;
     } else if (event->type() == QEvent::Gesture) {
         auto* gestures = static_cast<QGestureEvent*>(event);
@@ -765,27 +823,88 @@ bool WTrackTableView::viewportEvent(QEvent* event) {
             const auto index = indexAt(viewport()->mapFromGlobal(hold->position().toPoint()));
             if (trackModel && index.isValid()) {
                 scroller->stop();
+                QScroller::ungrabGesture(viewport());
                 if (!selectionModel()->isRowSelected(index.row(), index.parent())) {
                     selectRow(index.row());
                 }
                 selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
-                QList<QString> locations;
-                for (const auto& row : getSelectedRows()) {
-                    if (row.isValid()) {
-                        locations.append(trackModel->getTrackLocation(row));
-                    }
-                }
-                qInfo() << "OHOS touch track drag" << locations.size();
-                DragAndDropHelper::dragTrackLocations(locations, this, "library");
+                m_touchDragReady = true;
+                viewport()->setProperty("ohosTouchTrackHold", true);
+                m_touchHoldPosition = viewport()->mapFromGlobal(hold->position().toPoint());
+                m_touchHoldIndex = index;
+                qInfo() << "OHOS touch track hold ready" << index.row();
             }
             return true;
         }
     }
     return WLibraryTableView::viewportEvent(event);
 }
+
+void WTrackTableView::finishTouchHold(bool menu) {
+    const auto index = m_touchHoldIndex;
+    const auto position = viewport()->mapToGlobal(m_touchHoldPosition.toPoint());
+    m_touchDragReady = false;
+    viewport()->setProperty("ohosTouchTrackHold", false);
+    m_touchDragPending = false;
+    m_touchHoldIndex = QPersistentModelIndex();
+    QScroller::grabGesture(viewport(), QScroller::TouchGesture);
+    const QPointF outside(-QWIDGETSIZE_MAX, -QWIDGETSIZE_MAX);
+    QMouseEvent release(QEvent::MouseButtonRelease, outside, outside, Qt::LeftButton,
+            Qt::NoButton, Qt::NoModifier);
+    WLibraryTableView::mouseReleaseEvent(&release);
+    if (menu && index.isValid()) {
+        if (!m_pTrackMenu) {
+            initTrackMenu();
+        }
+        QTimer::singleShot(0, this, [this, position, index] {
+            if (index.isValid()) {
+                showTrackMenu(position, index);
+                qInfo() << "OHOS touch track context menu" << index.row();
+            }
+        });
+    }
+}
+
+void WTrackTableView::mouseReleaseEvent(QMouseEvent* event) {
+    if (m_touchDragReady && event->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen) {
+        finishTouchHold(true);
+        event->accept();
+        return;
+    }
+    WLibraryTableView::mouseReleaseEvent(event);
+}
+
+void WTrackTableView::startTouchTrackDrag() {
+    auto* model = getTrackModel();
+    if (!model || !m_touchHoldIndex.isValid()) {
+        finishTouchHold(false);
+        return;
+    }
+    m_touchDragReady = false;
+    QList<QString> locations;
+    for (const auto& row : getSelectedRows()) {
+        if (row.isValid()) {
+            locations.append(model->getTrackLocation(row));
+        }
+    }
+    qInfo() << "OHOS touch track drag" << locations.size();
+    TouchDragReleaseFilter releaseFilter;
+    auto* drag = DragAndDropHelper::dragTrackLocations(locations, this, "library");
+    qInfo() << "OHOS touch track drag finished" << (drag ? drag->target() : nullptr);
+    finishTouchHold(false);
+}
 #endif
 
 void WTrackTableView::mouseMoveEvent(QMouseEvent* pEvent) {
+#ifdef MIXXX_OS_OHOS
+    if (pEvent->pointingDevice()->type() == QInputDevice::DeviceType::TouchScreen) {
+        if (m_touchDragReady && (pEvent->position() - m_touchHoldPosition).manhattanLength() >= QApplication::startDragDistance()) {
+            startTouchTrackDrag();
+        }
+        pEvent->accept();
+        return;
+    }
+#endif
     // Only use this for drag and drop if the LeftButton is pressed we need to
     // check for this because mousetracking is activated and this function is
     // called every time the mouse is moved -- kain88 May 2012

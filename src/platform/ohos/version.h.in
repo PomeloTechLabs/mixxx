@@ -1,0 +1,3 @@
+#pragma once
+
+#define MIXXX_OHOS_VERSION "@MIXXX_OHOS_VERSION@"

@@ -4,6 +4,8 @@
 #include <QPointer>
 #include <QSize>
 #include <QTimer>
+#include <QMargins>
+#include "preferences/usersettings.h"
 
 class QLabel;
 class QAbstractScrollArea;
@@ -16,7 +18,7 @@ namespace mixxx::ohos {
 
 class WindowAdapter final : public QObject {
   public:
-    explicit WindowAdapter(QMainWindow* window);
+    explicit WindowAdapter(QMainWindow* window, UserSettingsPointer settings);
     void setSkin(QWidget* skin);
 
   protected:
@@ -30,8 +32,14 @@ class WindowAdapter final : public QObject {
     void publishDialogState();
     void scheduleDialogFit(QDialog* dialog);
     void fitDialog(QDialog* dialog);
+    QMargins safeMarginsNative() const;
+    QRect safeGeometry() const;
+    void applySafeMargins();
 
     QMainWindow* m_window;
+    UserSettingsPointer m_settings;
+    QMargins m_safeNative;
+    int m_displayMode = 0;
     QWidget* m_host;
     QLabel* m_sizeNotice;
     QPointer<QWidget> m_skin;

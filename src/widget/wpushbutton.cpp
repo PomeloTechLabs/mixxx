@@ -6,6 +6,9 @@
 #include <QStyleOption>
 #include <QStylePainter>
 #include <QtDebug>
+#ifdef MIXXX_OS_OHOS
+#include "platform/ohos/touchcompat.h"
+#endif
 
 #include "control/controlbehavior.h"
 #include "control/controlobject.h"
@@ -457,7 +460,12 @@ bool WPushButton::event(QEvent* e) {
                     Qt::LeftButton,
                     Qt::NoButton,
                     Qt::NoModifier,
+#ifdef MIXXX_OS_OHOS
+                    Qt::MouseEventSynthesizedByApplication,
+                    mixxx::ohos::touchConversionMouseDevice());
+#else
                     Qt::MouseEventSynthesizedByApplication);
+#endif
             mouseReleaseEvent(&mouseEvent);
         }
         m_bHovered = false;

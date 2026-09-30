@@ -438,6 +438,7 @@ void WMainMenuBar::initialize() {
 
     // OPTIONS MENU
     QMenu* pOptionsMenu = new QMenu(tr("&Options"), this);
+    pOptionsMenu->setObjectName(QStringLiteral("MixxxOptionsMenu"));
 #ifndef __APPLE__
     connectMenuToSlotShowMenuBar(pOptionsMenu);
 #endif

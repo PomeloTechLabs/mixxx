@@ -10,6 +10,7 @@ import qpa from 'libqohos.so';
 import mediaBridge from 'libmixxxohosmedia.so';
 import MixxxMediaSession from '../media/MixxxMediaSession';
 import {LOG_DOMAIN, LOG_TAG} from '../common/QtAppConstants';
+import { calculateSafeInsets, SafeRect } from '../common/SafeDisplay';
 
 interface MixxxDialogRect {
   left?: number;
@@ -34,6 +35,65 @@ export default class QAbility extends UIAbility {
   private mainKeyboardHeight: number = 0;
   private reportedKeyboardHeight: number = 0;
   private raisedDialogRevision: number = 0;
+  private safeTimer: number = 0;
+  private safeRevision: number = 0;
+  private lastSafeArea: string = '';
+  private readonly safeWindowChanged = (): void => { this.scheduleSafeArea(); };
+
+  private scheduleSafeArea(): void {
+    if (this.safeTimer !== 0) { clearTimeout(this.safeTimer); }
+    this.safeRevision++;
+    this.safeTimer = setTimeout((): void => {
+      this.safeTimer = 0;
+      this.updateSafeArea(this.safeRevision);
+    }, 120);
+  }
+
+  private async updateSafeArea(revision: number): Promise<void> {
+    const mainWindow = QAbility.mainWindow;
+    if (mainWindow === null || !this.foreground) { return; }
+    try {
+      const screen = display.getDefaultDisplaySync();
+      const rect = mainWindow.getWindowProperties().windowRect;
+      if (rect.width * rect.height === screen.width * screen.height &&
+          (rect.width !== screen.width || rect.height !== screen.height)) {
+        this.scheduleSafeArea();
+        return;
+      }
+      const area = mainWindow.getWindowAvoidArea(Window.AvoidAreaType.TYPE_CUTOUT);
+      const density: number = screen.densityPixels;
+      let radius: number = 0;
+      try {
+        screen.getRoundedCorner().forEach((corner: display.RoundedCorner): void => {
+          radius = Math.max(radius, corner.radius);
+        });
+      } catch (_) {}
+      const obstacles: SafeRect[] = [area.leftRect, area.topRect, area.rightRect, area.bottomRect]
+        .map((r: Window.Rect): SafeRect => {
+          return { left: rect.left + r.left, top: rect.top + r.top, width: r.width, height: r.height };
+        });
+      try {
+        const cutout = await screen.getCutoutInfo();
+        const waterfall = cutout.waterfallDisplayAreaRects;
+        [waterfall.left, waterfall.top, waterfall.right, waterfall.bottom].forEach((r: display.Rect): void => {
+          obstacles.push({ left: r.left, top: r.top, width: r.width, height: r.height });
+        });
+      } catch (_) {}
+      if (revision !== this.safeRevision || mainWindow !== QAbility.mainWindow) { return; }
+      const currentRect: SafeRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+      const insets = calculateSafeInsets(currentRect, screen.width, screen.height, density, radius, obstacles);
+      const serialized = JSON.stringify(insets);
+      if (serialized !== this.lastSafeArea) {
+        this.lastSafeArea = serialized;
+        mediaBridge.setSafeArea(insets.left, insets.top, insets.right, insets.bottom);
+        hilog.info(LOG_DOMAIN, LOG_TAG, 'QAbility safe display insets=' + serialized +
+          ' window=' + JSON.stringify(rect) + ' display=' + screen.width + 'x' + screen.height +
+          ' rotation=' + screen.rotation + ' radius=' + radius);
+      }
+    } catch (err) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'QAbility safe display: ' + JSON.stringify(err));
+    }
+  }
   private readonly windowStatusChanged = (status: Window.WindowStatusType): void => {
     const mainWindow = QAbility.mainWindow;
     if (mainWindow !== null) {
@@ -46,6 +106,7 @@ export default class QAbility extends UIAbility {
   private async applyWindowLayout(mainWindow: Window.Window, status?: Window.WindowStatusType): Promise<void> {
     const currentStatus = status ?? mainWindow.getWindowStatus();
     await mainWindow.setWindowLayoutFullScreen(currentStatus !== Window.WindowStatusType.FLOATING);
+    this.scheduleSafeArea();
     const properties = mainWindow.getWindowProperties();
     hilog.info(LOG_DOMAIN, LOG_TAG, 'QAbility window layout status=' + currentStatus +
       ' window=' + JSON.stringify(properties.windowRect) +
@@ -235,6 +296,7 @@ export default class QAbility extends UIAbility {
           mainWindow.setSpecificSystemBarEnabled('status', false),
           mainWindow.setSpecificSystemBarEnabled('navigationIndicator', false)
         ]).then((): void => {
+          this.scheduleSafeArea();
           hilog.info(LOG_DOMAIN, LOG_TAG, 'QAbility[' + attempt + '] system bars hidden');
           if (attempt === 'retry5s') {
             hilog.info(LOG_DOMAIN, LOG_TAG, 'QAbility system avoid area: ' +
@@ -266,6 +328,8 @@ export default class QAbility extends UIAbility {
     if (QAbility.mainWindow !== null) {
       QAbility.mainWindow.off('keyboardHeightChange', this.keyboardHeightChanged);
       QAbility.mainWindow.off('windowStatusChange', this.windowStatusChanged);
+      QAbility.mainWindow.off('windowSizeChange', this.safeWindowChanged);
+      QAbility.mainWindow.off('avoidAreaChange', this.safeWindowChanged);
     }
     QAbility.mainWindow = windowStage.getMainWindowSync();
     QAbility.mainWindow.setPreferredOrientation(Window.Orientation.AUTO_ROTATION_LANDSCAPE)
@@ -274,6 +338,9 @@ export default class QAbility extends UIAbility {
       });
     QAbility.mainWindow.on('keyboardHeightChange', this.keyboardHeightChanged);
     QAbility.mainWindow.on('windowStatusChange', this.windowStatusChanged);
+    QAbility.mainWindow.on('windowSizeChange', this.safeWindowChanged);
+    QAbility.mainWindow.on('avoidAreaChange', this.safeWindowChanged);
+    this.scheduleSafeArea();
     if (this.foreground) {
       this.startKeyboardObserver();
     }
@@ -326,9 +393,13 @@ export default class QAbility extends UIAbility {
     this.stopKeyboardObserver();
     this.keyboardStage = null;
     this.clearFullscreenTimers();
+    if (this.safeTimer !== 0) { clearTimeout(this.safeTimer); this.safeTimer = 0; }
+    this.safeRevision++;
     if (QAbility.mainWindow !== null) {
       QAbility.mainWindow.off('keyboardHeightChange', this.keyboardHeightChanged);
       QAbility.mainWindow.off('windowStatusChange', this.windowStatusChanged);
+      QAbility.mainWindow.off('windowSizeChange', this.safeWindowChanged);
+      QAbility.mainWindow.off('avoidAreaChange', this.safeWindowChanged);
     }
     QAbility.mainWindow = null;
     qpa.handleAbilityOnWindowStageDestroy(this);

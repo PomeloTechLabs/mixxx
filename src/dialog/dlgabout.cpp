@@ -66,7 +66,7 @@ DlgAbout::DlgAbout([[maybe_unused]] UserSettingsPointer settings)
     mixxx_logo->load(QString(MIXXX_LOGO_PATH));
 
     version_label->setText(VersionStore::applicationName() +
-            QStringLiteral(" ") + VersionStore::version());
+            QStringLiteral(" ") + VersionStore::applicationVersion());
     git_version_label->setText(VersionStore::gitVersion());
     qt_version_label->setText(VersionStore::qtVersion());
     platform_label->setText(VersionStore::platform());
