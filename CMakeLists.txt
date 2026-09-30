@@ -3495,6 +3495,17 @@ if(ENGINEPRIME)
         -DCMAKE_CXX_FLAGS=-Wno-error=deprecated-literal-operator
       )
     endif()
+    # The OHOS toolchain file adds --gcc-toolchain to the base flags, which
+    # the self-contained OHOS clang reports as unused during compilation.
+    # libdjinterop builds with -Werror, so fresh builds fail on that warning;
+    # demote it (the flag is a no-op for this compiler anyway).
+    if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+      list(
+        APPEND
+        DJINTEROP_EXTRA_CMAKE_ARGS
+        -DCMAKE_CXX_FLAGS=-Wno-error=unused-command-line-argument
+      )
+    endif()
 
     # For offline builds download the archive file from the URL and
     # copy it into DOWNLOAD_DIR under DOWNLOAD_NAME prior to starting
