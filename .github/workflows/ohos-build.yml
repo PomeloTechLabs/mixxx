@@ -94,6 +94,21 @@ jobs:
           test -d /data/out/qt-ohos
           /apps/harmony/bin/hvigorw --version
 
+      # The vcpkg arm64-ohos protobuf config needs a HOST protoc; the image
+      # carries only the target installed tree, so fetch the exact x64-linux
+      # build (vcpkg 33.4.0) from the buildenv-assets prerelease.
+      - name: Provision host protoc
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/protoc-dl
+          gh release download buildenv-assets-1 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'protoc-*' --dir /tmp/protoc-dl
+          install -Dm755 /tmp/protoc-dl/protoc-* \
+            /data/vcpkg/vcpkg/packages/protobuf_x64-linux/tools/protobuf/protoc
+          /data/vcpkg/vcpkg/packages/protobuf_x64-linux/tools/protobuf/protoc --version
+
       # CI builds unsigned: an empty signingConfigs profile makes hvigor
       # skip SignHap. The repo's own profile points at a developer machine's
       # debug material and would fail here. Restored after packaging.
@@ -149,6 +164,7 @@ jobs:
             -DQT_HOST_PATH=/data/out/qt-host \
             -DCMAKE_FIND_ROOT_PATH="/data/out/qt-ohos;/data/vcpkg/vcpkg/installed/arm64-ohos" \
             -DBUILD_TESTING=OFF -DQML=ON -DFFMPEG=ON \
+            -DProtobuf_PROTOC_EXECUTABLE=/data/vcpkg/vcpkg/packages/protobuf_x64-linux/tools/protobuf/protoc \
             -DHID=OFF -DBULK=OFF -DPORTMIDI=OFF -DBROADCAST=OFF -DVINYLCONTROL=OFF \
             -DQTKEYCHAIN=OFF -DFAAD=OFF -DMAD=OFF -DMODPLUG=OFF \
             -DKEYFINDER=OFF -DLILV=OFF -DWAVPACK=OFF
