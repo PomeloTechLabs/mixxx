@@ -126,7 +126,7 @@ export default class MixxxMediaSession {
       if (this.closed) {
         return;
       }
-      const accepted = mediaBridge.sendCommand(command, value);
+      const accepted: boolean = mediaBridge.sendCommand(command, value);
       if (accepted && command === 'stop') {
         this.stopRequested = true;
       } else if (accepted && command === 'play') {
@@ -198,7 +198,7 @@ export default class MixxxMediaSession {
       if (state.artworkKey !== this.artworkKey) {
         artwork = undefined;
         if (state.artworkAvailable) {
-          const bytes = mediaBridge.readArtwork(state.artworkKey);
+          const bytes: ArrayBuffer = mediaBridge.readArtwork(state.artworkKey);
           if (bytes.byteLength === 0) {
             return;
           }
