@@ -64,7 +64,19 @@ CI 校验 tag 号与 revision 一致后才出包；Release 附带 `ci-source.jso
 - 镜像内 Qt pins 变更（`qt-ohos-pins.txt`）或 vcpkg commit 变更需要重跑
   buildenv 镜像；Dockerfile 顶部 `ARG VCPKG_COMMIT` 与 vcpkg volume 的
   `VCPKG_COMMIT.txt` 保持一致。
-- 托管 runner 冷构建约 1.5–3 小时（无 ccache，后续可加）。
+- 托管 runner 冷构建约 50 分钟（configure + 全量编译 + 打包，实测通过）。
 - GHCR 镜像名必须全小写：`ghcr.io/pomelotechlabs/mixxx/buildenv-ohos`。
+- 本地无 `write:packages` 凭据时，用 `buildenv-assets-1` 预发布 Release
+  中转镜像分片，再跑 "OHOS buildenv publish (from release assets)" workflow
+  用 GITHUB_TOKEN 推上 GHCR（2026-09-30 首推即此路径）。该 Release 还托管
+  宿主 `protoc-33.4.0`（vcpkg x64-linux 构建），CI 每次 build 会下载——
+  **不要删这个资产**。
+- 基底镜像缺 qsb 等宿主工具所需的 GL 运行库（本地容器是后来手动装的），
+  workflow 里 "Ensure host-tool runtime libraries" 步骤在每次构建时补装。
+- 容器 CLT 的 SDK 是 **HarmonyOS 6.1.1 / API 24**，而仓库 profile pin 的是
+  6.1.0(23)：CI 的免签 profile 覆写为 6.1.1(24)；**上架/正式发布仍以本地
+  DevEco(23) 构建为准**，CI 产物用于迭代分发，两者 SDK 版本不同属已知差异。
+- API 24 的 ArkTS 规范比 23 严（`arkts-no-any-unknown` 等），改 .ets 时注意
+  显式类型。
 
 > 本文档由 AI 助手自主生成。
