@@ -3503,6 +3503,7 @@ if(ENGINEPRIME)
       list(
         APPEND
         DJINTEROP_EXTRA_CMAKE_ARGS
+        -DCMAKE_C_FLAGS=-Wno-error=unused-command-line-argument
         -DCMAKE_CXX_FLAGS=-Wno-error=unused-command-line-argument
       )
     endif()
