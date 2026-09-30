@@ -116,7 +116,10 @@ jobs:
 
       # CI builds unsigned: an empty signingConfigs profile makes hvigor
       # skip SignHap. The repo's own profile points at a developer machine's
-      # debug material and would fail here. Restored after packaging.
+      # debug material and would fail here. SDK versions target the CLT in
+      # the buildenv image (HarmonyOS 6.1.1 / API 24); official store builds
+      # keep using 6.1.0(23) from the local DevEco SDK. Restored after
+      # packaging.
       # The buildenv base image predates some host-tool runtime libs the
       # local build container got via ad-hoc apt installs (qsb from
       # qt-host needs libEGL). Keep in sync with the Dockerfile apt set.
@@ -145,10 +148,10 @@ jobs:
               "products": [
                 {
                   "name": "default",
-                  "compatibleSdkVersion": "6.1.0(23)",
+                  "compatibleSdkVersion": "6.1.1(24)",
                   "runtimeOS": "HarmonyOS",
-                  "targetSdkVersion": "6.1.0(23)",
-                  "compileSdkVersion": "6.1.0(23)"
+                  "targetSdkVersion": "6.1.1(24)",
+                  "compileSdkVersion": "6.1.1(24)"
                 }
               ],
               "buildModeSet": [
