@@ -59,6 +59,25 @@ CI 校验 tag 号与 revision 一致后才出包；Release 附带 `ci-source.jso
 `ci-artifact.json`（版本、哈希、来源 commit）。需要正式上架时，再在本地按
 `docs/ohos/logs/<date>-release/sign_release.py` 流程对同一 tag 的产物做发布签名。
 
+## 与上游 CI 的关系（重要）
+
+这个 fork 只构建 OHOS 版本，上游的 CI（develop/AppImage/Flatpak/checks/
+release 等 workflow 文件）已从 `ohos-port` 分支**删除**（2026-09-30，
+commit "drop upstream platform CI workflows"），Actions 页面只保留三个
+OHOS workflow。历史失败 run 记录也已清理。
+
+**每次 `git merge main` 同步上游后，这些文件会被合并带回来**，需要重跑
+清理（在合并提交前执行）：
+
+```bash
+cd .github/workflows
+git rm appimage.yml benchmark.yml build.yml changelog.yml checks.yml \
+       develop.yml download_cleanup.yml flatpak.yml git.yml labeler.yml \
+       pr-command.yml pre-commit.yml release.yml stale.yml sync_branches.yml 2>/dev/null
+```
+
+（文件名以上游实际变更为准；保留 `ohos-*.yml` 三个。）
+
 ## 已知边界
 
 - 镜像内 Qt pins 变更（`qt-ohos-pins.txt`）或 vcpkg commit 变更需要重跑
